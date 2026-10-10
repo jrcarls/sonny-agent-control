@@ -2,6 +2,7 @@
 
 import fcntl
 import os
+import shutil
 import subprocess
 from contextlib import contextmanager
 from pathlib import Path
@@ -39,8 +40,16 @@ def _locked(path):
             fcntl.flock(lock_file, fcntl.LOCK_UN)
 
 
+def workspaces_root():
+    return Path(settings.WORKSPACES_DIR) / "runs"
+
+
 def workspace_path(run):
-    return Path(settings.WORKSPACES_DIR) / "runs" / str(run.pk)
+    return workspaces_root() / str(run.pk)
+
+
+def _repo_path(project_id):
+    return Path(settings.WORKSPACES_DIR) / "repos" / f"{project_id}.git"
 
 
 def prepare_workspace(run):
@@ -50,7 +59,7 @@ def prepare_workspace(run):
         return path
 
     project = run.project
-    repo = Path(settings.WORKSPACES_DIR) / "repos" / f"{project.pk}.git"
+    repo = _repo_path(project.pk)
     repo.parent.mkdir(parents=True, exist_ok=True)
     path.parent.mkdir(parents=True, exist_ok=True)
 
@@ -64,3 +73,20 @@ def prepare_workspace(run):
         git("worktree", "prune", cwd=repo)
         git("worktree", "add", "-B", run.branch, str(path), f"origin/{project.default_branch}", cwd=repo)
     return path
+
+
+def remove_workspace(run):
+    """Apaga o worktree e a branch local da execução. O que já foi enviado ao remoto continua lá."""
+    path = workspace_path(run)
+    repo = _repo_path(run.project_id)
+    if not repo.exists():
+        shutil.rmtree(path, ignore_errors=True)
+        return
+    with _locked(repo.with_suffix(".lock")):
+        if path.exists():
+            git("worktree", "remove", "--force", str(path), cwd=repo)
+        git("worktree", "prune", cwd=repo)
+        try:
+            git("branch", "-D", run.branch, cwd=repo)
+        except WorkspaceError:
+            pass  # a branch pode nem ter sido criada

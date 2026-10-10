@@ -1,19 +1,25 @@
 from contextlib import contextmanager
+from datetime import timedelta
 
 from celery import shared_task
-from django.db import connection
+from django.conf import settings
+from django.db import connection, transaction
 from django.utils import timezone
 from langgraph.checkpoint.postgres import PostgresSaver
 from langgraph.types import Command
 from psycopg.conninfo import make_conninfo
 
-from .graph import build_graph, initial_state
+from .graph import USAGE, build_graph, initial_state
 from .models import Approval, Run, RunEvent
-from .workspace import prepare_workspace, workspace_path
+from .workspace import prepare_workspace, remove_workspace, workspace_path, workspaces_root
 
 MAX_EVENT_LENGTH = 4000
 # Teto de passos do grafo por execução, para um agente em laço não rodar para sempre
 RECURSION_LIMIT = 100
+
+
+class TokenLimitExceeded(Exception):
+    pass
 
 
 @contextmanager
@@ -28,10 +34,22 @@ def open_checkpointer():
         yield checkpointer
 
 
+def _count_tokens(run, entry):
+    run.input_tokens += entry["input"]
+    run.output_tokens += entry["output"]
+    run.save(update_fields=["input_tokens", "output_tokens"])
+    limit = settings.RUN_MAX_TOKENS
+    if limit and run.total_tokens > limit:
+        raise TokenLimitExceeded(f"A execução passou do limite de {limit} tokens (usou {run.total_tokens}).")
+
+
 def _record_log(run, update):
     """Grava os eventos de um passo do grafo; devolve a última mensagem do agente principal, se houver."""
     text = ""
     for entry in (update or {}).get("log", []):
+        if entry["kind"] == USAGE:
+            _count_tokens(run, entry)
+            continue
         run.events.create(kind=entry["kind"], agent_id=entry["agent_id"], content=entry["content"][:MAX_EVENT_LENGTH])
         if entry["kind"] == RunEvent.Kind.MESSAGE and entry["agent_id"] == run.agent_id:
             text = entry["content"]
@@ -45,14 +63,18 @@ def _graph_input(run, snapshot):
         approvals = run.approvals.filter(tool_call_id__in=requested)
         return Command(resume={item.tool_call_id: item.status == Approval.Status.APPROVED for item in approvals})
     if snapshot.next:
-        return None  # parou no meio (ex.: worker reiniciado): continua do último passo salvo
+        return None  # parou no meio (falha ou worker reiniciado): continua do último passo salvo
     run.events.create(kind=RunEvent.Kind.STATUS, content=f"Agente {run.agent.name} começou a trabalhar.")
     return initial_state(run)
 
 
+def _cancel_requested(run):
+    return Run.objects.filter(pk=run.pk, cancel_requested=True).exists()
+
+
 @shared_task
 def execute_run(run_id):
-    """Roda o grafo da execução até ele terminar ou parar esperando aprovação."""
+    """Roda o grafo da execução até ele terminar, parar esperando aprovação ou ser cancelado."""
     # Só começa se estiver na fila: evita rodar duas vezes se a tarefa for reentregue
     if not Run.objects.filter(pk=run_id, status=Run.Status.QUEUED).update(status=Run.Status.RUNNING):
         return
@@ -61,8 +83,7 @@ def execute_run(run_id):
         run.started_at = timezone.now()
         run.save(update_fields=["started_at"])
 
-    result = ""
-    requested = []
+    result, requested, canceled, error = "", [], False, None
     try:
         if not workspace_path(run).exists():
             run.events.create(kind=RunEvent.Kind.STATUS, content="Preparando o repositório.")
@@ -78,12 +99,23 @@ def execute_run(run_id):
                         requested = node_update[0].value
                     else:
                         result = _record_log(run, node_update) or result
+                # O cancelamento vale entre um passo e outro: o passo em curso termina antes
+                if _cancel_requested(run):
+                    canceled = True
+                    break
     except Exception as exc:
-        run.events.create(kind=RunEvent.Kind.ERROR, content=f"{type(exc).__name__}: {exc}")
-        run.status = Run.Status.FAILED
-        run.finished_at = timezone.now()
-    else:
-        if requested:
+        error = exc
+
+    with transaction.atomic():
+        # Mesma trava da tela de cancelar: o pedido chega antes ou depois deste desfecho, nunca no meio
+        cancel_requested = Run.objects.select_for_update().get(pk=run.pk).cancel_requested
+        if error is not None:
+            run.events.create(kind=RunEvent.Kind.ERROR, content=f"{type(error).__name__}: {error}")
+            run.status = Run.Status.FAILED
+            run.finished_at = timezone.now()
+        elif canceled or (requested and cancel_requested):
+            run.mark_canceled()
+        elif requested:
             for item in requested:
                 run.approvals.get_or_create(
                     tool_call_id=item["id"],
@@ -96,4 +128,19 @@ def execute_run(run_id):
             run.status = Run.Status.SUCCEEDED
             run.finished_at = timezone.now()
             run.events.create(kind=RunEvent.Kind.STATUS, content="Execução concluída.")
-    run.save(update_fields=["result", "status", "finished_at"])
+        run.save(update_fields=["result", "status", "finished_at"])
+
+
+@shared_task
+def cleanup_workspaces(days=None):
+    """Apaga worktrees de execuções finalizadas há mais de `days` dias. Devolve quantos foram apagados."""
+    days = settings.WORKSPACE_RETENTION_DAYS if days is None else days
+    cutoff = timezone.now() - timedelta(days=days)
+    root = workspaces_root()
+    removed = 0
+    for path in root.iterdir() if root.exists() else []:
+        run = Run.objects.filter(pk=path.name).first() if path.name.isdigit() else None
+        if run is not None and run.finished_at and run.finished_at < cutoff:
+            remove_workspace(run)
+            removed += 1
+    return removed

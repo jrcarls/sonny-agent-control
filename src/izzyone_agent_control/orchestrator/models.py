@@ -1,6 +1,7 @@
 from django.conf import settings
 from django.db import models
 from django.urls import reverse
+from django.utils import timezone
 
 from .tools import TOOL_SPECS
 
@@ -66,6 +67,7 @@ class Run(models.Model):
         WAITING = "waiting_approval", "Aguardando aprovação"
         SUCCEEDED = "succeeded", "Concluída"
         FAILED = "failed", "Falhou"
+        CANCELED = "canceled", "Cancelada"
 
     ACTIVE_STATUSES = [Status.QUEUED, Status.RUNNING, Status.WAITING]
 
@@ -75,6 +77,10 @@ class Run(models.Model):
     status = models.CharField("situação", max_length=20, choices=Status, default=Status.QUEUED)
     result = models.TextField("resultado", blank=True)
     pull_request_url = models.URLField("pull request", blank=True)
+    # Pedido de cancelamento de uma execução em andamento; o worker para no fim do passo atual
+    cancel_requested = models.BooleanField(default=False)
+    input_tokens = models.PositiveBigIntegerField("tokens de entrada", default=0)
+    output_tokens = models.PositiveBigIntegerField("tokens de saída", default=0)
     created_by = models.ForeignKey(
         settings.AUTH_USER_MODEL, verbose_name="criada por", on_delete=models.PROTECT, related_name="runs"
     )
@@ -101,6 +107,18 @@ class Run(models.Model):
     @property
     def branch(self):
         return f"izzyone/run-{self.pk}"
+
+    @property
+    def total_tokens(self):
+        return self.input_tokens + self.output_tokens
+
+    def mark_canceled(self):
+        """Encerra a execução como cancelada; os pedidos de aprovação que esperavam resposta caem junto."""
+        self.status = self.Status.CANCELED
+        self.finished_at = timezone.now()
+        self.save(update_fields=["status", "finished_at"])
+        self.approvals.filter(status=Approval.Status.PENDING).update(status=Approval.Status.CANCELED)
+        self.events.create(kind=RunEvent.Kind.STATUS, content="Execução cancelada.")
 
 
 class RunEvent(models.Model):
@@ -135,6 +153,7 @@ class Approval(models.Model):
         PENDING = "pending", "Pendente"
         APPROVED = "approved", "Aprovada"
         REJECTED = "rejected", "Negada"
+        CANCELED = "canceled", "Cancelada"
 
     run = models.ForeignKey(Run, verbose_name="execução", on_delete=models.CASCADE, related_name="approvals")
     agent = models.ForeignKey(

@@ -12,6 +12,13 @@ from django.views.generic import CreateView, DeleteView, DetailView, ListView, U
 from .forms import AgentForm, ProjectForm, RunForm
 from .models import Agent, Approval, Project, Run, RunEvent
 from .tasks import execute_run
+from .workspace import workspace_path
+
+
+def enqueue(run, event):
+    run.events.create(kind=RunEvent.Kind.STATUS, content=event)
+    # Só enfileira depois do commit, para o worker enxergar a execução no banco
+    transaction.on_commit(lambda: execute_run.delay(run.pk))
 
 
 class ProtectedDeleteMixin:
@@ -40,10 +47,7 @@ class HomeView(LoginRequiredMixin, CreateView):
     def form_valid(self, form):
         form.instance.created_by = self.request.user
         response = super().form_valid(form)
-        run = self.object
-        run.events.create(kind=RunEvent.Kind.STATUS, content="Execução colocada na fila.")
-        # Só enfileira depois do commit, para o worker enxergar a execução no banco
-        transaction.on_commit(lambda: execute_run.delay(run.pk))
+        enqueue(self.object, "Execução colocada na fila.")
         return response
 
 
@@ -114,7 +118,7 @@ class RunListView(LoginRequiredMixin, ListView):
     paginate_by = 25
     FILTERS = {
         "ativas": {"status__in": Run.ACTIVE_STATUSES},
-        "finalizadas": {"status__in": [Run.Status.SUCCEEDED, Run.Status.FAILED]},
+        "finalizadas": {"status__in": [Run.Status.SUCCEEDED, Run.Status.FAILED, Run.Status.CANCELED]},
     }
 
     def get_queryset(self):
@@ -125,6 +129,11 @@ class RunListView(LoginRequiredMixin, ListView):
         return super().get_context_data(**kwargs, situacao=self.request.GET.get("situacao", ""))
 
 
+def can_resume(run):
+    """Uma execução que falhou pode continuar do último passo salvo enquanto o worktree dela existir."""
+    return run.status == Run.Status.FAILED and workspace_path(run).exists()
+
+
 class RunDetailView(LoginRequiredMixin, DetailView):
     queryset = Run.objects.select_related("project", "agent")
     context_object_name = "run"
@@ -132,11 +141,61 @@ class RunDetailView(LoginRequiredMixin, DetailView):
     def get_context_data(self, **kwargs):
         pending = self.object.approvals.filter(status=Approval.Status.PENDING).select_related("agent")
         events = self.object.events.select_related("agent")
-        return super().get_context_data(**kwargs, pending_approvals=pending, events=events)
+        return super().get_context_data(
+            **kwargs, pending_approvals=pending, events=events, can_resume=can_resume(self.object)
+        )
 
     def get_template_names(self):
         # A tela consulta este mesmo endereço via htmx enquanto a execução está ativa
         return ["runs/_progress.html"] if self.request.htmx else ["runs/detail.html"]
+
+
+class RunCancelView(LoginRequiredMixin, View):
+    def post(self, request, pk):
+        with transaction.atomic():
+            run = get_object_or_404(Run.objects.select_for_update(), pk=pk)
+            who = request.user.get_username()
+            if run.status == Run.Status.RUNNING:
+                # O worker vê o pedido no fim do passo atual e encerra a execução
+                if not run.cancel_requested:
+                    run.cancel_requested = True
+                    run.save(update_fields=["cancel_requested"])
+                    run.events.create(kind=RunEvent.Kind.STATUS, content=f"{who} pediu o cancelamento.")
+            elif run.status in [Run.Status.QUEUED, Run.Status.WAITING]:
+                run.events.create(kind=RunEvent.Kind.STATUS, content=f"{who} cancelou a execução.")
+                run.mark_canceled()
+            else:
+                messages.error(request, "Esta execução já terminou.")
+        return redirect(run)
+
+
+class RunResumeView(LoginRequiredMixin, View):
+    """Recoloca na fila uma execução que falhou; o grafo continua do último passo salvo."""
+
+    def post(self, request, pk):
+        with transaction.atomic():
+            run = get_object_or_404(Run.objects.select_for_update(), pk=pk)
+            if can_resume(run):
+                run.status = Run.Status.QUEUED
+                run.finished_at = None
+                run.cancel_requested = False
+                run.save(update_fields=["status", "finished_at", "cancel_requested"])
+                enqueue(run, f"{request.user.get_username()} mandou continuar de onde parou.")
+            else:
+                messages.error(request, "Esta execução não pode ser continuada.")
+        return redirect(run)
+
+
+class RunRetryView(LoginRequiredMixin, View):
+    """Cria uma execução nova com a mesma tarefa, projeto e agente, começando do zero."""
+
+    def post(self, request, pk):
+        original = get_object_or_404(Run, pk=pk)
+        run = Run.objects.create(
+            project=original.project, agent=original.agent, prompt=original.prompt, created_by=request.user
+        )
+        enqueue(run, f"Execução colocada na fila (nova tentativa de {original}).")
+        return redirect(run)
 
 
 class ApprovalListView(LoginRequiredMixin, ListView):

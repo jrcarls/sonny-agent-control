@@ -1,6 +1,7 @@
 from pathlib import Path
 
 import environ
+from celery.schedules import crontab
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
@@ -79,6 +80,16 @@ CELERY_BROKER_URL = env("CELERY_BROKER_URL", default="redis://localhost:6379/0")
 CELERY_RESULT_BACKEND = env("CELERY_RESULT_BACKEND", default="redis://localhost:6379/1")
 CELERY_TIMEZONE = "America/Sao_Paulo"
 CELERY_TASK_TRACK_STARTED = True
+# Execuções são longas: cada processo do worker pega uma por vez, sem reservar outras da fila
+CELERY_WORKER_CONCURRENCY = env.int("CELERY_WORKER_CONCURRENCY", default=2)
+CELERY_WORKER_PREFETCH_MULTIPLIER = 1
+# Rodado pelo "celery beat": limpeza diária dos worktrees antigos
+CELERY_BEAT_SCHEDULE = {
+    "cleanup-workspaces": {
+        "task": "izzyone_agent_control.orchestrator.tasks.cleanup_workspaces",
+        "schedule": crontab(hour=3, minute=0),
+    },
+}
 
 # Clones dos projetos e um worktree por execução; fica fora do controle de versão
 WORKSPACES_DIR = Path(env("WORKSPACES_DIR", default=BASE_DIR / ".workspaces"))
@@ -86,6 +97,10 @@ WORKSPACES_DIR = Path(env("WORKSPACES_DIR", default=BASE_DIR / ".workspaces"))
 AGENT_GIT_NAME = env("AGENT_GIT_NAME", default="IzzyOne Agent")
 AGENT_GIT_EMAIL = env("AGENT_GIT_EMAIL", default="agent@izzyone.local")
 GITHUB_TOKEN = env("GITHUB_TOKEN", default="")
+# Dias que o worktree de uma execução finalizada fica guardado antes da limpeza
+WORKSPACE_RETENTION_DAYS = env.int("WORKSPACE_RETENTION_DAYS", default=7)
+# Teto de tokens (entrada + saída, somando todos os agentes) por execução; 0 desliga
+RUN_MAX_TOKENS = env.int("RUN_MAX_TOKENS", default=2_000_000)
 
 AUTH_PASSWORD_VALIDATORS = [
     {"NAME": "django.contrib.auth.password_validation.UserAttributeSimilarityValidator"},

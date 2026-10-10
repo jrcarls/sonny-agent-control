@@ -25,6 +25,8 @@ MODEL_PROVIDERS = {
 }
 
 DELEGATE_TOOL = "delegate_task"
+# Entrada do log que não vira evento: consumo de tokens de uma chamada ao modelo
+USAGE = "usage"
 
 
 class Frame(TypedDict):
@@ -139,6 +141,9 @@ def build_graph(run, workspace, checkpointer):
             if call["name"] != DELEGATE_TOOL:
                 arguments = json.dumps(call["args"], ensure_ascii=False, indent=2)
                 log.append(_entry(RunEvent.Kind.TOOL_CALL, agent, f"{call['name']}\n{arguments}"))
+        # Por último: se o limite de tokens estourar, a resposta do agente já ficou registrada
+        usage = response.usage_metadata or {}
+        log.append({"kind": USAGE, "input": usage.get("input_tokens", 0), "output": usage.get("output_tokens", 0)})
         return {"frames": frames, "log": log}
 
     def after_work(state: State):

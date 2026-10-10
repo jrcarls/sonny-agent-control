@@ -6,6 +6,8 @@
             <span class="rounded bg-warning-soft px-1.5 py-0.5 text-xs font-medium text-fg-warning">Pendente</span>
         {% elif approval.status == "approved" %}
             <span class="rounded bg-success-soft px-1.5 py-0.5 text-xs font-medium text-fg-success-strong">Aprovada</span>
+        {% elif approval.status == "canceled" %}
+            <span class="rounded bg-neutral-tertiary px-1.5 py-0.5 text-xs font-medium text-body">Cancelada</span>
         {% else %}
             <span class="rounded bg-danger-soft px-1.5 py-0.5 text-xs font-medium text-fg-danger-strong">Negada</span>
         {% endif %}
