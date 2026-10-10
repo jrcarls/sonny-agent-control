@@ -1,28 +1,81 @@
-services:
-  mailpit:
-    image: axllent/mailpit
-    restart: unless-stopped
-    ports:
-      - "127.0.0.1:1025:1025" # SMTP
-      - "127.0.0.1:8025:8025" # Interface web
+# Base comum aos ambientes: o que cada serviço é e como eles se ligam.
+# Não sobe sozinho; combine com um dos dois:
+#   desenvolvimento:  docker compose -f compose.yaml -f compose.dev.yaml up
+#   produção:         docker compose -f compose.yaml -f compose.prod.yaml up -d
+# Com COMPOSE_FILE definido no .env (veja .env.example), basta "docker compose up".
 
+# Configuração compartilhada por web, worker e beat, que rodam a mesma imagem
+x-app: &app
+  build:
+    context: .
+  env_file:
+    - path: .env
+      required: false
+  environment: &app-environment
+    DATABASE_URL: postgres://izzyone:${POSTGRES_PASSWORD:-izzyone}@postgres:5432/izzyone
+    CELERY_BROKER_URL: redis://redis:6379/0
+    CELERY_RESULT_BACKEND: redis://redis:6379/1
+    WORKSPACES_DIR: /data/workspaces
+  volumes:
+    # Clones dos projetos e worktrees das execuções: o worker escreve, a web só consulta
+    - workspaces:/data/workspaces
+  depends_on: &app-depends-on
+    postgres:
+      condition: service_healthy
+    redis:
+      condition: service_healthy
+
+services:
   postgres:
     image: postgres:17
-    restart: unless-stopped
     environment:
       POSTGRES_DB: izzyone
       POSTGRES_USER: izzyone
-      POSTGRES_PASSWORD: izzyone
-    ports:
-      - "127.0.0.1:5432:5432"
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-izzyone}
     volumes:
       - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U izzyone -d izzyone"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
 
   redis:
     image: redis:7
-    restart: unless-stopped
-    ports:
-      - "127.0.0.1:6379:6379" # Broker do Celery
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  # Interface web. Aplica as migrações antes de subir, então worker e beat esperam por ela.
+  web:
+    <<: *app
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/accounts/login/', timeout=3)"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 20s
+
+  # Executa os agentes
+  worker:
+    <<: *app
+    command: celery -A config worker -l info
+    depends_on:
+      <<: *app-depends-on
+      web:
+        condition: service_healthy
+
+  # Agenda a limpeza diária dos worktrees antigos
+  beat:
+    <<: *app
+    command: celery -A config beat -l info --schedule /tmp/celerybeat-schedule
+    depends_on:
+      <<: *app-depends-on
+      web:
+        condition: service_healthy
 
 volumes:
   postgres_data:
+  workspaces:

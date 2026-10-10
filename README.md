@@ -10,34 +10,66 @@ Feito com Django, Celery e LangGraph. Cada agente usa o provedor e o modelo do p
 
 ## Requisitos
 
-- Python 3.14 e [uv](https://docs.astral.sh/uv/)
-- Node.js (só para compilar o CSS)
-- Docker (Postgres, Redis e Mailpit de desenvolvimento)
-- git, com credenciais para clonar e enviar para os repositórios dos projetos
+- Docker com o plugin Compose
 
-## Primeira vez
+Para rodar fora do Docker (opcional): Python 3.14 com [uv](https://docs.astral.sh/uv/) e Node.js.
+
+## Subindo com Docker
+
+Os ambientes são montados em camadas: `compose.yaml` descreve os serviços, e `compose.dev.yaml` ou
+`compose.prod.yaml` acrescentam o que é próprio de cada ambiente. O `.env` escolhe qual vale, pela
+variável `COMPOSE_FILE`.
+
+| Serviço | Papel |
+|---|---|
+| `web` | Interface web; aplica as migrações ao subir |
+| `worker` | Executa os agentes (Celery) |
+| `beat` | Agenda a limpeza diária dos worktrees antigos |
+| `postgres`, `redis` | Banco e fila |
+| `tailwind`, `mailpit` | Só em desenvolvimento: recompila o CSS e recebe os e-mails |
+
+### Desenvolvimento
 
 ```bash
-cp .env.example .env            # preencha a chave do provedor de LLM que for usar
-docker compose up -d            # Postgres, Redis e Mailpit
-uv sync
-npm install && npm run build
+cp .env.example .env     # preencha a chave do provedor de LLM e, para repositórios privados, o GITHUB_TOKEN
+docker compose up        # interface em http://localhost:8000
+```
+
+O código entra nos containers por bind mount: a web recarrega sozinha, o worker reinicia quando um `.py`
+muda e o CSS é recompilado quando um template muda. Crie sua conta em `/accounts/signup/`; os e-mails caem
+no Mailpit, em http://localhost:8025.
+
+```bash
+docker compose exec web python manage.py test                   # testes
+docker compose exec web python manage.py cleanup_workspaces     # limpeza manual dos worktrees
+docker compose build                                            # depois de mudar dependências
+```
+
+### Produção
+
+No `.env` do servidor, troque `COMPOSE_FILE` para `compose.yaml:compose.prod.yaml` e defina `SECRET_KEY`,
+`POSTGRES_PASSWORD`, `ALLOWED_HOSTS` e `CSRF_TRUSTED_ORIGINS` (o `.env.example` lista todos). Depois:
+
+```bash
+docker compose up -d --build
+docker compose exec web python manage.py createsuperuser    # a criação de conta pela tela fica fechada
+```
+
+O código e os arquivos estáticos ficam dentro da imagem e a web roda com gunicorn. Ela escuta só em
+`127.0.0.1:8000`: coloque um proxy com HTTPS (Caddy, nginx, Traefik) na frente, repassando o cabeçalho
+`X-Forwarded-Proto`. Para atualizar, `git pull` e `docker compose up -d --build`.
+
+### Rodando fora do Docker
+
+Dá para deixar só o banco, a fila e o Mailpit no Docker e rodar o resto na máquina:
+
+```bash
+docker compose up -d postgres redis mailpit
+uv sync && npm install && npm run build
 uv run python manage.py migrate
+uv run python manage.py runserver        # interface web
+uv run celery -A config worker -l info   # executa os agentes (outro terminal)
 ```
-
-## Rodando
-
-São dois processos obrigatórios e dois opcionais, cada um em um terminal:
-
-```bash
-uv run python manage.py runserver        # interface web, em http://localhost:8000
-uv run celery -A config worker -l info   # executa os agentes
-uv run celery -A config beat -l info     # opcional: limpeza diária dos worktrees antigos
-npm run css:watch                        # opcional: recompila o CSS ao editar templates
-```
-
-Crie sua conta em `/accounts/signup/`; os e-mails de desenvolvimento caem no Mailpit, em
-http://localhost:8025. Depois cadastre um projeto e um agente e envie uma tarefa pela tela inicial.
 
 ## Configuração
 
@@ -56,7 +88,8 @@ Os demais limites e prazos de operação (tempo máximo de um comando, tamanho d
 por execução etc.) estão reunidos na seção "Orquestrador" do `config/settings.py`, e cada um aceita uma variável
 de ambiente de mesmo nome.
 
-O worker clona e envia código com as credenciais git da máquina em que roda (chave SSH ou credential helper).
+No Docker, o worker clona e envia código para o GitHub com o `GITHUB_TOKEN`. Fora do Docker, usa as
+credenciais git da máquina (chave SSH ou credential helper).
 
 ## Como funciona
 
@@ -74,6 +107,7 @@ Uma execução pode ser cancelada, continuada do último passo salvo (se falhou)
 ## Estrutura
 
 ```
+Dockerfile, compose*.yaml, docker/   imagem e ambientes de desenvolvimento e produção
 config/                              settings, urls e a configuração do Celery
 orchestrator/                        o app Django
     models.py                        Project, Agent, Run, RunEvent, Approval
@@ -90,6 +124,6 @@ static/                              CSS de entrada e JavaScript de terceiros
 ## Testes e manutenção
 
 ```bash
-uv run python manage.py test                          # precisa do Postgres no ar
-uv run python manage.py cleanup_workspaces --days 7   # apaga worktrees de execuções antigas
+docker compose exec web python manage.py test                          # ou: uv run python manage.py test
+docker compose exec web python manage.py cleanup_workspaces --days 7   # apaga worktrees de execuções antigas
 ```

@@ -11,12 +11,11 @@ dependencies = [
     "celery[redis]>=5.6.3",
     "django>=6.1.2",
     "django-allauth>=65.19.7",
-    "django-browser-reload>=1.21.0",
     "django-cotton>=2.7.2",
-    "django-debug-toolbar>=8.0.0",
     "django-environ>=0.14.0",
     "django-htmx>=1.29.0",
     "django-tabler-icons>=0.7.2",
+    "gunicorn>=26.2.0",
     "httpx>=0.28.1",
     "langchain>=1.4.4",
     "langchain-anthropic>=1.7.5",
@@ -34,3 +33,10 @@ dependencies = [
 [tool.uv]
 # Aplicação Django, não um pacote instalável: o código roda direto da raiz do projeto
 package = false
+
+[dependency-groups]
+dev = [
+    "django-browser-reload>=1.21.0",
+    "django-debug-toolbar>=8.0.0",
+    "watchfiles>=1.3.0",
+]

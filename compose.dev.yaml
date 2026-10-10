@@ -1,0 +1,54 @@
+# Desenvolvimento: código por bind mount com recarga automática, portas abertas só na sua máquina.
+# Uso: docker compose -f compose.yaml -f compose.dev.yaml up
+
+x-dev: &dev
+  image: izzyone-agent-control:dev
+  build:
+    target: dev
+  volumes:
+    - .:/app
+    - workspaces:/data/workspaces
+
+services:
+  web:
+    <<: *dev
+    command: sh -c "python manage.py migrate --noinput && python manage.py runserver 0.0.0.0:8000"
+    environment:
+      EMAIL_HOST: mailpit
+    ports:
+      - "127.0.0.1:${WEB_PORT:-8000}:8000"
+
+  worker:
+    <<: *dev
+    # Reinicia o worker quando um arquivo .py muda
+    command: watchfiles --filter python "celery -A config worker -l info"
+
+  beat:
+    <<: *dev
+
+  # Recompila o CSS quando um template muda
+  tailwind:
+    image: node:22-slim
+    working_dir: /app
+    user: "1000:1000"
+    # npm ci só na primeira vez: instala exatamente o que está no package-lock.json, sem reescrevê-lo
+    command: sh -c "[ -d node_modules ] || npm ci --no-audit --no-fund; npm run css:watch"
+    tty: true
+    volumes:
+      - .:/app
+
+  # Caixa de entrada dos e-mails de desenvolvimento, em http://localhost:8025
+  mailpit:
+    image: axllent/mailpit
+    ports:
+      - "127.0.0.1:1025:1025" # SMTP
+      - "127.0.0.1:8025:8025" # Interface web
+
+  # Portas abertas para rodar manage.py e os testes direto na máquina, fora do Docker
+  postgres:
+    ports:
+      - "127.0.0.1:5432:5432"
+
+  redis:
+    ports:
+      - "127.0.0.1:6379:6379"

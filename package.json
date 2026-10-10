@@ -4,7 +4,7 @@
     "build": "npm run css:build && npm run js:build",
     "css:build": "tailwindcss -i ./static/css/input.css -o ./static/css/output.css --minify",
     "css:watch": "tailwindcss -i ./static/css/input.css -o ./static/css/output.css --watch",
-    "js:build": "cp ./node_modules/flowbite/dist/flowbite.min.js ./static/js/flowbite.min.js"
+    "js:build": "cp ./node_modules/flowbite/dist/flowbite.min.js ./node_modules/flowbite/dist/flowbite.min.js.map ./static/js/"
   },
   "dependencies": {
     "flowbite": "^4.0.2"

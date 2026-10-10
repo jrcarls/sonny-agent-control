@@ -1,3 +1,4 @@
+import sys
 from pathlib import Path
 
 import environ
@@ -11,9 +12,13 @@ env = environ.Env(
 )
 environ.Env.read_env(BASE_DIR / ".env")
 
-SECRET_KEY = env("SECRET_KEY", default="django-insecure-troque-em-producao")
 DEBUG = env("DEBUG")
-ALLOWED_HOSTS = env("ALLOWED_HOSTS")
+# Em produção (DEBUG=False) a chave é obrigatória: sem ela o sistema nem sobe
+SECRET_KEY = env("SECRET_KEY", default="django-insecure-troque-em-producao") if DEBUG else env("SECRET_KEY")
+# localhost entra sempre, para a verificação de saúde feita de dentro do próprio container
+ALLOWED_HOSTS = [*env("ALLOWED_HOSTS"), "localhost", "127.0.0.1"]
+# Endereços públicos do sistema com esquema, ex.: https://agentes.exemplo.com (exigido atrás de proxy com HTTPS)
+CSRF_TRUSTED_ORIGINS = env.list("CSRF_TRUSTED_ORIGINS", default=[])
 
 INSTALLED_APPS = [
     "django.contrib.admin",
@@ -26,8 +31,6 @@ INSTALLED_APPS = [
     "django_htmx",
     "allauth",
     "allauth.account",
-    "debug_toolbar",
-    "django_browser_reload",
     "tabler_icons",
     "orchestrator",
 ]
@@ -40,7 +43,6 @@ AUTHENTICATION_BACKENDS = [
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
     "whitenoise.middleware.WhiteNoiseMiddleware",
-    "debug_toolbar.middleware.DebugToolbarMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
@@ -49,8 +51,23 @@ MIDDLEWARE = [
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
     "django_htmx.middleware.HtmxMiddleware",
     "allauth.account.middleware.AccountMiddleware",
-    "django_browser_reload.middleware.BrowserReloadMiddleware",
 ]
+
+# Ferramentas só de desenvolvimento: ficam fora da imagem de produção e dos testes
+# (a barra de depuração se recusa a rodar junto com o test runner)
+DEV_TOOLS = DEBUG and "test" not in sys.argv
+if DEV_TOOLS:
+    INSTALLED_APPS += ["debug_toolbar", "django_browser_reload"]
+    MIDDLEWARE.insert(2, "debug_toolbar.middleware.DebugToolbarMiddleware")
+    MIDDLEWARE.append("django_browser_reload.middleware.BrowserReloadMiddleware")
+    # Dentro do Docker o pedido não vem de 127.0.0.1, então a barra aparece sempre que DEBUG estiver ligado
+    DEBUG_TOOLBAR_CONFIG = {"SHOW_TOOLBAR_CALLBACK": lambda request: True}
+if not DEBUG:
+    # Atrás de um proxy que termina o HTTPS e repassa o esquema original neste cabeçalho
+    SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
+
+# Cookies só por HTTPS; desligue (SECURE_COOKIES=False) apenas para acessar produção por http
+SESSION_COOKIE_SECURE = CSRF_COOKIE_SECURE = env.bool("SECURE_COOKIES", default=not DEBUG)
 
 ROOT_URLCONF = "config.urls"
 
@@ -158,6 +175,10 @@ STORAGES = {
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
 LOGIN_REDIRECT_URL = "/"
+# Criação de conta pela tela: aberta em desenvolvimento, fechada em produção, onde qualquer
+# conta consegue mandar agentes rodarem comandos no servidor. Crie usuários com createsuperuser.
+SIGNUP_OPEN = env.bool("SIGNUP_OPEN", default=DEBUG)
+ACCOUNT_ADAPTER = "orchestrator.adapters.AccountAdapter"
 
 # Em desenvolvimento os e-mails vão para o Mailpit (docker compose up -d),
 # com a caixa de entrada em http://localhost:8025

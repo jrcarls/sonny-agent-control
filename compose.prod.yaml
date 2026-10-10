@@ -1,0 +1,46 @@
+# Produção: código dentro da imagem, gunicorn, reinício automático e nada exposto além da web.
+# Uso: docker compose -f compose.yaml -f compose.prod.yaml up -d --build
+#
+# Exige no .env: SECRET_KEY, POSTGRES_PASSWORD, ALLOWED_HOSTS e CSRF_TRUSTED_ORIGINS.
+# A web escuta só em 127.0.0.1:8000; coloque um proxy com HTTPS (Caddy, nginx, Traefik) na frente.
+
+# Nome próprio para não dividir containers e volumes com o ambiente de desenvolvimento na mesma máquina
+name: izzyone-prod
+
+x-prod: &prod
+  image: izzyone-agent-control:prod
+  build:
+    target: prod
+  restart: unless-stopped
+
+x-prod-environment: &prod-environment
+  DEBUG: "False"
+  SECRET_KEY: ${SECRET_KEY:?defina SECRET_KEY no .env}
+  DATABASE_URL: postgres://izzyone:${POSTGRES_PASSWORD:?defina POSTGRES_PASSWORD no .env}@postgres:5432/izzyone
+
+services:
+  web:
+    <<: *prod
+    command: >
+      sh -c "python manage.py migrate --noinput &&
+             gunicorn config.wsgi:application --bind 0.0.0.0:8000
+             --workers ${WEB_WORKERS:-3} --timeout 120 --access-logfile -"
+    environment: *prod-environment
+    ports:
+      - "${WEB_BIND:-127.0.0.1:8000}:8000"
+
+  worker:
+    <<: *prod
+    environment: *prod-environment
+
+  beat:
+    <<: *prod
+    environment: *prod-environment
+
+  postgres:
+    restart: unless-stopped
+    environment:
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?defina POSTGRES_PASSWORD no .env}
+
+  redis:
+    restart: unless-stopped

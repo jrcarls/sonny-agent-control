@@ -1,0 +1,9 @@
+.git
+.venv
+node_modules
+.workspaces
+.env
+db.sqlite3
+staticfiles
+static/css/output.css
+**/__pycache__
