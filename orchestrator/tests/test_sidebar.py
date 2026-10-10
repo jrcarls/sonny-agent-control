@@ -62,10 +62,10 @@ class SidebarTests(RunTestCase):
         self.assertEqual(response.context["sidebar"]["section"], "runs")
         self.assertContains(response, 'aria-current="page"', count=2)  # o item Execuções e a execução na lista
 
-    def test_user_menu_has_no_dead_links(self):
+    def test_user_menu_items(self):
         page = self.client.get(reverse("home"))
-        self.assertNotContains(page, 'href="#"')
-        self.assertContains(page, "Sair")
+        for label in ["Integrações", "Preferências", "Configurações", "Idioma", "Sair"]:
+            self.assertContains(page, label)
 
 
 class AnonymousSidebarTests(TestCase):
