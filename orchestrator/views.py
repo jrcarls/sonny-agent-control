@@ -12,7 +12,7 @@ from django.views.generic import CreateView, DeleteView, DetailView, ListView, T
 
 from .forms import AgentForm, ProjectForm, RunForm
 from .models import Agent, Approval, Project, Run, RunEvent
-from .providers import MODEL_SUGGESTIONS, check_model, missing_api_keys
+from .providers import MODEL_SUGGESTIONS, ModelListError, check_model, list_models, missing_api_keys
 from .tasks import execute_run
 from .workspace import workspace_path
 
@@ -167,8 +167,24 @@ class AgentFormMixin:
     """Dados de apoio da tela do agente: sugestões de modelo e provedores sem chave configurada."""
 
     def get_context_data(self, **kwargs):
-        suggestions = {provider.value: models for provider, models in MODEL_SUGGESTIONS.items()}
-        return super().get_context_data(**kwargs, model_suggestions=suggestions, missing_keys=missing_api_keys())
+        context = super().get_context_data(**kwargs, missing_keys=missing_api_keys())
+        # A tela abre com as sugestões fixas e troca pela lista real do provedor assim que ela chega
+        context["models"] = MODEL_SUGGESTIONS.get(context["form"]["provider"].value(), [])
+        return context
+
+
+class AgentModelsView(LoginRequiredMixin, View):
+    """Opções do campo "Modelo" para um provedor: a lista real dele ou, se a consulta falhar, as fixas."""
+
+    def get(self, request):
+        provider = request.GET.get("provider", "")
+        context = {"models": [], "live": False, "provider": provider}
+        if provider in Agent.Provider.values:
+            try:
+                context["models"], context["live"] = list_models(provider), True
+            except ModelListError as exc:
+                context["models"], context["error"] = MODEL_SUGGESTIONS[Agent.Provider(provider)], str(exc)
+        return render(request, "agents/_model_options.html", context)
 
 
 class AgentTestView(LoginRequiredMixin, View):

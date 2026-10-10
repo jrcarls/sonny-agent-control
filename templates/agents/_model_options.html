@@ -1,0 +1,11 @@
+{# Resposta do htmx ao trocar de provedor: as opções do campo "Modelo" e, fora do lugar (oob), a linha que diz de onde vieram #}
+{% for name in models %}<option value="{{ name }}"></option>{% endfor %}
+<p id="model-source" hx-swap-oob="true" class="mt-2 text-sm {% if error %}text-fg-warning{% else %}text-body{% endif %}">
+    {% if live %}
+        {{ models|length }} modelos disponíveis neste provedor; escolha um ou digite o identificador.
+    {% elif error %}
+        Não foi possível consultar os modelos do provedor ({{ error }}). Mostrando sugestões fixas; você também pode digitar o identificador.
+    {% else %}
+        Escolha o provedor para ver os modelos disponíveis.
+    {% endif %}
+</p>

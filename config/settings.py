@@ -109,6 +109,7 @@ AGENT_GIT_NAME = env("AGENT_GIT_NAME", default="IzzyOne Agent")
 AGENT_GIT_EMAIL = env("AGENT_GIT_EMAIL", default="agent@izzyone.local")
 GITHUB_TOKEN = env("GITHUB_TOKEN", default="")
 GITHUB_API_TIMEOUT = env.int("GITHUB_API_TIMEOUT", default=30)
+GOOGLE_API_KEY = env("GOOGLE_API_KEY", default="")
 
 # Execuções
 # Teto de tokens (entrada + saída, somando todos os agentes) por execução; 0 desliga
@@ -122,8 +123,9 @@ TOOL_MAX_OUTPUT_CHARS = env.int("TOOL_MAX_OUTPUT_CHARS", default=20_000)
 # Prazo, em segundos, da ferramenta "Rodar comando" e da busca no código
 TOOL_COMMAND_TIMEOUT = env.int("TOOL_COMMAND_TIMEOUT", default=300)
 TOOL_SEARCH_TIMEOUT = env.int("TOOL_SEARCH_TIMEOUT", default=60)
-# Prazo, em segundos, do botão "Testar agente"
-AGENT_TEST_TIMEOUT = env.int("AGENT_TEST_TIMEOUT", default=20)
+# Prazo, em segundos, do botão "Testar agente" e da consulta à lista de modelos de um provedor
+AGENT_TEST_TIMEOUT = env.int("AGENT_TEST_TIMEOUT", default=60)
+PROVIDER_LIST_TIMEOUT = env.int("PROVIDER_LIST_TIMEOUT", default=10)
 
 AUTH_PASSWORD_VALIDATORS = [
     {"NAME": "django.contrib.auth.password_validation.UserAttributeSimilarityValidator"},

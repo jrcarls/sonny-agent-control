@@ -13,6 +13,7 @@ urlpatterns = [
     path("agentes/", views.AgentListView.as_view(), name="agent_list"),
     path("agentes/novo/", views.AgentCreateView.as_view(), name="agent_create"),
     path("agentes/testar/", views.AgentTestView.as_view(), name="agent_test"),
+    path("agentes/modelos/", views.AgentModelsView.as_view(), name="agent_models"),
     path("agentes/<int:pk>/", views.AgentUpdateView.as_view(), name="agent_update"),
     path("agentes/<int:pk>/excluir/", views.AgentDeleteView.as_view(), name="agent_delete"),
     path("execucoes/", views.RunListView.as_view(), name="run_list"),

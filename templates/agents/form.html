@@ -18,12 +18,13 @@
             {% if form.is_active %}<c-field :field="form.is_active" />{% endif %}
         </section>
 
-        {# O provedor escolhido define as sugestões do campo "Modelo" e o aviso de chave ausente #}
+        {# Ao escolher o provedor, o htmx busca os modelos dele para o campo "Modelo"; o Alpine mostra o aviso de chave ausente #}
         <section class="mb-6 rounded-base border border-default bg-neutral-primary-soft p-5 shadow-xs" x-data="{ provider: '{{ form.provider.value|default_if_none:""|escapejs }}' }">
             <h2 class="mb-4 text-lg font-semibold text-heading">Modelo</h2>
             <div class="mb-4">
                 <label for="{{ form.provider.id_for_label }}" class="mb-2.5 block text-sm font-medium text-heading">{{ form.provider.label|capfirst }}</label>
-                <c-input as="select" name="{{ form.provider.html_name }}" id="{{ form.provider.id_for_label }}" required="1" x-model="provider" :errors="form.provider.errors">
+                <c-input as="select" name="{{ form.provider.html_name }}" id="{{ form.provider.id_for_label }}" required="1" x-model="provider" :errors="form.provider.errors"
+                         hx-get="{% url 'orchestrator:agent_models' %}" hx-trigger="load, change" hx-target="#model-options">
                     {% for value, label in form.provider.field.choices %}
                         <option value="{{ value }}" {% if form.provider.value|stringformat:'s' == value|stringformat:'s' %}selected{% endif %}>{{ label }}</option>
                     {% endfor %}
@@ -39,15 +40,13 @@
                 <label for="{{ form.model.id_for_label }}" class="mb-2.5 block text-sm font-medium text-heading">{{ form.model.label|capfirst }}</label>
                 <c-input type="text" name="{{ form.model.html_name }}" id="{{ form.model.id_for_label }}" value="{{ form.model.value|default_if_none:'' }}"
                          maxlength="{{ form.model.field.max_length }}" required="1" autocomplete="off"
-                         placeholder="{{ form.model.field.widget.attrs.placeholder }}" x-bind:list="'models-' + provider"
+                         placeholder="{{ form.model.field.widget.attrs.placeholder }}" list="model-options"
                          :errors="form.model.errors" />
-                {% for provider, models in model_suggestions.items %}
-                    <datalist id="models-{{ provider }}">
-                        {% for name in models %}<option value="{{ name }}"></option>{% endfor %}
-                    </datalist>
-                {% endfor %}
+                <datalist id="model-options">
+                    {% for name in models %}<option value="{{ name }}"></option>{% endfor %}
+                </datalist>
                 {% for error in form.model.errors %}<p class="mt-2 text-sm text-fg-danger-strong">{{ error }}</p>{% endfor %}
-                <p class="mt-2 text-sm text-body">{{ form.model.help_text }}</p>
+                <p id="model-source" class="mt-2 text-sm text-body">{{ form.model.help_text }}</p>
             </div>
             <div class="flex flex-wrap items-start gap-3">
                 <c-button variant="secondary" type="button" hx-post="{% url 'orchestrator:agent_test' %}" hx-include="closest form" hx-target="#agent-test-result" hx-disabled-elt="this" hx-indicator="#agent-test-wait">Testar agente</c-button>

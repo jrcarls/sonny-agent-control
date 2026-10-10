@@ -2,6 +2,7 @@ import os
 from unittest import mock
 
 from django.contrib.auth import get_user_model
+from django.core.cache import cache
 from django.test import TestCase
 from django.urls import reverse
 from langchain_core.messages import AIMessage
@@ -36,14 +37,16 @@ class AgentFormLayoutTests(AgentFormTestCase):
             self.assertContains(page, f">{title}</h2>")
         self.assertNotContains(page, ">Delegação</h2>")  # só aparece quando há outro agente para escolher
 
-    def test_model_field_offers_suggestions_per_provider(self):
-        page = self.client.get(self.create_url)
-        self.assertContains(page, '<datalist id="models-anthropic">')
+    def test_model_field_starts_with_fixed_suggestions_and_asks_the_provider_for_the_real_list(self):
+        agent = Agent.objects.create(name="Revisor", provider="anthropic", model="claude-sonnet-5-5")
+        page = self.client.get(agent.get_absolute_url())
+        self.assertContains(page, '<datalist id="model-options">')
         self.assertContains(page, '<option value="claude-sonnet-5-5"></option>')
-        self.assertContains(page, '<datalist id="models-ollama">')
+        self.assertContains(page, f'hx-get="{reverse("orchestrator:agent_models")}"')
+        self.assertContains(page, 'list="model-options"')
         # A sugestão não restringe: qualquer identificador é aceito
         self.client.post(self.create_url, {"name": "Local", "provider": "ollama", "model": "meu-modelo:latest"})
-        self.assertEqual(Agent.objects.get().model, "meu-modelo:latest")
+        self.assertEqual(Agent.objects.get(name="Local").model, "meu-modelo:latest")
 
     def test_tools_are_grouped_and_sensitive_ones_are_flagged(self):
         page = self.client.get(self.create_url)
@@ -125,7 +128,7 @@ class CheckModelTests(TestCase):
         chat.invoke.return_value = AIMessage(content=" ok \n")
         with mock.patch.object(providers, "init_chat_model", return_value=chat) as init:
             answer, seconds = providers.check_model("google", "gemini-2.5-flash")
-        init.assert_called_once_with("gemini-2.5-flash", model_provider="google_genai", timeout=20, max_retries=0)
+        init.assert_called_once_with("gemini-2.5-flash", model_provider="google_genai", timeout=60, max_retries=0)
         self.assertEqual(answer, "ok")
         self.assertGreaterEqual(seconds, 0)
 
@@ -135,3 +138,100 @@ class CheckModelTests(TestCase):
         with mock.patch.object(providers, "init_chat_model", return_value=chat) as init:
             providers.check_model("ollama", "llama3.3")
         init.assert_called_once_with("llama3.3", model_provider="ollama")
+
+
+def fake_models(*names, attribute="id"):
+    return [mock.Mock(**{attribute: name}) for name in names]
+
+
+class ListModelsTests(TestCase):
+    def setUp(self):
+        cache.clear()
+        self.addCleanup(cache.clear)
+        self.enterContext(mock.patch.dict(os.environ, {"ANTHROPIC_API_KEY": "a", "OPENAI_API_KEY": "o", "GOOGLE_API_KEY": "g"}))
+
+    def test_anthropic_keeps_the_order_of_the_api(self):
+        with mock.patch("anthropic.Anthropic") as client:
+            client.return_value.models.list.return_value = fake_models("claude-opus-5-5", "claude-haiku-5-5")
+            self.assertEqual(providers.list_models("anthropic"), ["claude-opus-5-5", "claude-haiku-5-5"])
+        client.assert_called_once_with(api_key="a", timeout=10, max_retries=0)
+
+    def test_openai_keeps_only_chat_models(self):
+        names = ["gpt-5", "gpt-5-mini", "o4-mini", "gpt-4o-audio-preview", "text-embedding-3-large", "whisper-1", "dall-e-3"]
+        with mock.patch("openai.OpenAI") as client:
+            client.return_value.models.list.return_value = fake_models(*names)
+            self.assertEqual(providers.list_models("openai"), ["o4-mini", "gpt-5-mini", "gpt-5"])
+
+    def test_google_keeps_only_text_models_that_generate_content(self):
+        models = [
+            mock.Mock(supported_actions=["generateContent"]),
+            mock.Mock(supported_actions=["generateContent"]),
+            mock.Mock(supported_actions=["generateContent"]),
+            mock.Mock(supported_actions=["embedContent"]),
+            mock.Mock(supported_actions=["generateContent"]),
+            mock.Mock(supported_actions=None),
+        ]
+        names = ["gemma-4-31b-it", "gemini-3.8-flash", "gemini-3.8-flash-tts", "gemini-embedding-1", "lyria-3.5", "gemini-x"]
+        for model, name in zip(models, names):
+            model.name = f"models/{name}"
+        with mock.patch("google.genai.Client") as client:
+            client.return_value.models.list.return_value = models
+            self.assertEqual(providers.list_models("google"), ["gemini-3.8-flash", "gemma-4-31b-it"])
+        self.assertEqual(client.call_args.kwargs["http_options"].timeout, 10_000)
+
+    def test_ollama_lists_local_models_without_a_key(self):
+        with mock.patch("ollama.Client") as client:
+            client.return_value.list.return_value.models = fake_models("qwen3", "llama3.3", attribute="model")
+            self.assertEqual(providers.list_models("ollama"), ["llama3.3", "qwen3"])
+
+    def test_result_is_cached_and_failures_are_not(self):
+        with mock.patch("anthropic.Anthropic") as client:
+            client.return_value.models.list.side_effect = [RuntimeError("fora do ar"), fake_models("claude-opus-5-5")]
+            with self.assertRaisesMessage(providers.ModelListError, "RuntimeError: fora do ar"):
+                providers.list_models("anthropic")
+            self.assertEqual(providers.list_models("anthropic"), ["claude-opus-5-5"])
+            self.assertEqual(providers.list_models("anthropic"), ["claude-opus-5-5"])
+        self.assertEqual(client.return_value.models.list.call_count, 2)
+
+    def test_missing_key_and_empty_list_are_errors(self):
+        with mock.patch.dict(os.environ, {"OPENAI_API_KEY": ""}):
+            with self.assertRaisesMessage(providers.ModelListError, "OPENAI_API_KEY não está configurada"):
+                providers.list_models("openai")
+        with mock.patch("ollama.Client") as client:
+            client.return_value.list.return_value.models = []
+            with self.assertRaisesMessage(providers.ModelListError, "nenhum modelo"):
+                providers.list_models("ollama")
+
+
+class AgentModelsEndpointTests(AgentFormTestCase):
+    def get(self, **params):
+        return self.client.get(reverse("orchestrator:agent_models"), params)
+
+    def test_live_list_is_returned_as_options(self):
+        with mock.patch("orchestrator.views.list_models", return_value=["gemini-3.8-flash", "gemini-2.5-flash"]) as lister:
+            response = self.get(provider="google")
+        lister.assert_called_once_with("google")
+        self.assertTemplateUsed(response, "agents/_model_options.html")
+        self.assertContains(response, '<option value="gemini-3.8-flash"></option>')
+        self.assertContains(response, "2 modelos disponíveis neste provedor")
+        self.assertContains(response, 'hx-swap-oob="true"')
+
+    def test_failure_falls_back_to_fixed_suggestions_and_says_why(self):
+        error = providers.ModelListError("a chave OPENAI_API_KEY não está configurada no servidor")
+        with mock.patch("orchestrator.views.list_models", side_effect=error):
+            response = self.get(provider="openai")
+        self.assertContains(response, '<option value="gpt-5"></option>')
+        self.assertContains(response, "Não foi possível consultar")
+        self.assertContains(response, "OPENAI_API_KEY não está configurada")
+
+    def test_unknown_or_empty_provider_returns_no_options(self):
+        with mock.patch("orchestrator.views.list_models") as lister:
+            for params in [{}, {"provider": ""}, {"provider": "nope"}]:
+                response = self.get(**params)
+                self.assertNotContains(response, "<option")
+                self.assertContains(response, "Escolha o provedor")
+        lister.assert_not_called()
+
+    def test_requires_login(self):
+        self.client.logout()
+        self.assertEqual(self.get(provider="google").status_code, 302)
