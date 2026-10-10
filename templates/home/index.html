@@ -5,8 +5,8 @@
 
 {% block content %}
 <div class="mx-auto max-w-4xl py-6">
-    <h1 class="text-2xl font-semibold tracking-tight text-heading">Olá, {{ user.get_username }}</h1>
-    <p class="mt-1 mb-6 text-sm text-body">Descreva uma tarefa e escolha o projeto e o agente que vai executá-la.</p>
+    <h1 class="text-3xl font-semibold tracking-tight text-heading">Olá, {{ user.get_username }}</h1>
+    <p class="mt-2 mb-6 text-base text-body">O que os agentes vão fazer agora?</p>
 
     {{ agents_without_key|json_script:"agents-without-key" }}
     {# sending: evita enviar duas vezes. agent/missing: aviso quando o provedor do agente escolhido está sem chave. #}
@@ -19,27 +19,29 @@
           }"
           @submit="if (sending) $event.preventDefault(); sending = true" @pageshow.window="sending = false">
         {% csrf_token %}
-        <div class="w-full rounded-base border border-default-medium bg-neutral-secondary-medium shadow-xs">
+        <div class="w-full rounded-base border border-default-medium bg-neutral-secondary-medium shadow-sm transition focus-within:border-brand focus-within:ring-1 focus-within:ring-brand">
             <div class="rounded-t-base bg-neutral-secondary-medium px-4 py-3">
                 <label for="prompt" class="sr-only">Tarefa para o agente</label>
-                <textarea id="prompt" name="prompt" rows="4" required {% if can_submit %}autofocus{% endif %}
-                          x-init="grow($el)" @input="grow($el)"
+                <textarea id="prompt" name="prompt" rows="3" required {% if can_submit %}autofocus{% endif %}
+                          x-ref="prompt" x-init="grow($el)" @input="grow($el)"
                           @keydown.ctrl.enter.prevent="$el.form.requestSubmit()" @keydown.meta.enter.prevent="$el.form.requestSubmit()"
-                          class="block max-h-96 w-full resize-none border-0 bg-neutral-secondary-medium px-0 text-sm text-heading placeholder:text-body focus:ring-0"
-                          placeholder="O que você quer que o agente faça?">{{ form.prompt.value|default_if_none:"" }}</textarea>
+                          class="block max-h-96 w-full resize-none border-0 bg-neutral-secondary-medium px-0 text-base text-heading placeholder:text-body focus:ring-0"
+                          placeholder="Descreva a tarefa: o que fazer, em que parte do código e como saber que terminou.">{{ form.prompt.value|default_if_none:"" }}</textarea>
             </div>
             <div class="flex flex-wrap items-center gap-3 border-t border-default-medium px-3 py-2">
-                <div>
+                <div class="relative">
                     <label for="project" class="sr-only">Projeto</label>
-                    <select id="project" name="project" required {% if not can_submit %}disabled{% endif %} class="w-44 block rounded-base border border-default-medium bg-neutral-primary-soft px-3 py-2 text-sm shadow-xs focus:border-brand focus:ring-brand {% if can_submit %}text-heading{% else %}cursor-not-allowed text-fg-disabled{% endif %}">
+                    <span class="pointer-events-none absolute inset-y-0 start-0 flex items-center ps-2.5 text-body">{% tabler_icon "folders" "h-4 w-4" %}</span>
+                    <select id="project" name="project" required {% if not can_submit %}disabled{% endif %} class="w-44 ps-8 block rounded-base border border-default-medium bg-neutral-primary-soft px-3 py-2 text-sm shadow-xs focus:border-brand focus:ring-brand {% if can_submit %}text-heading{% else %}cursor-not-allowed text-fg-disabled{% endif %}">
                         {% for value, text in form.project.field.choices %}
                             <option value="{{ value }}" {% if form.project.value|stringformat:"s" == value|stringformat:"s" %}selected{% endif %}>{{ text }}</option>
                         {% endfor %}
                     </select>
                 </div>
-                <div>
+                <div class="relative">
                     <label for="agent" class="sr-only">Agente</label>
-                    <select id="agent" name="agent" required {% if not can_submit %}disabled{% endif %} x-model="agent" class="w-64 max-w-full block rounded-base border border-default-medium bg-neutral-primary-soft px-3 py-2 text-sm shadow-xs focus:border-brand focus:ring-brand {% if can_submit %}text-heading{% else %}cursor-not-allowed text-fg-disabled{% endif %}">
+                    <span class="pointer-events-none absolute inset-y-0 start-0 flex items-center ps-2.5 text-body">{% tabler_icon "robot" "h-4 w-4" %}</span>
+                    <select id="agent" name="agent" required {% if not can_submit %}disabled{% endif %} x-model="agent" class="w-64 max-w-full ps-8 block rounded-base border border-default-medium bg-neutral-primary-soft px-3 py-2 text-sm shadow-xs focus:border-brand focus:ring-brand {% if can_submit %}text-heading{% else %}cursor-not-allowed text-fg-disabled{% endif %}">
                         {% for value, text in form.agent.field.choices %}
                             <option value="{{ value }}" {% if form.agent.value|stringformat:"s" == value|stringformat:"s" %}selected{% endif %}>{{ text }}</option>
                         {% endfor %}
@@ -56,6 +58,14 @@
         <p x-cloak x-show="missing[agent]" class="mt-2.5 text-sm text-fg-warning">
             O provedor deste agente está sem chave configurada no servidor (<code class="font-mono" x-text="missing[agent]"></code>). A execução vai falhar até ela ser definida.
         </p>
+        {% if can_submit %}
+            <div class="mt-3 flex flex-wrap gap-2">
+                {% for suggestion in suggestions %}
+                    <button type="button" @click="$refs.prompt.value = $el.textContent.trim(); grow($refs.prompt); $refs.prompt.focus()"
+                            class="cursor-pointer rounded-full border border-default-medium bg-neutral-primary-soft px-3 py-1 text-xs font-medium text-body hover:border-brand hover:text-heading">{{ suggestion }}</button>
+                {% endfor %}
+            </div>
+        {% endif %}
         {% for field in form %}
             {% for error in field.errors %}
                 <p class="mt-2.5 text-sm text-fg-danger-strong">{{ field.label|capfirst }}: {{ error }}</p>
@@ -91,9 +101,39 @@
         </ol>
     {% endif %}
 
-    <h2 class="mt-10 mb-4 text-lg font-semibold text-heading">Atividade recente</h2>
+    {% if stats %}
+        <h2 class="sr-only">Resumo</h2>
+        <div class="mt-10 grid grid-cols-2 gap-4 lg:grid-cols-4">
+            {% for stat in stats %}
+                <a href="{{ stat.url }}" class="rounded-base border p-4 shadow-xs hover:bg-neutral-secondary-medium {% if stat.attention and stat.value %}border-warning-subtle bg-warning-soft{% else %}border-default bg-neutral-primary-soft{% endif %}">
+                    <div class="flex items-center justify-between text-body">
+                        <span class="text-sm">{{ stat.label }}</span>
+                        {% tabler_icon stat.icon "h-5 w-5" %}
+                    </div>
+                    <p class="mt-2 text-2xl font-semibold text-heading">{{ stat.value }}</p>
+                </a>
+            {% endfor %}
+        </div>
+    {% endif %}
+
+    <div class="mt-10 mb-4 flex items-center justify-between">
+        <h2 class="text-lg font-semibold text-heading">Atividade recente</h2>
+        {% if recent_runs %}<a href="{% url 'orchestrator:run_list' %}" class="text-sm font-medium text-fg-brand hover:underline">Ver todas</a>{% endif %}
+    </div>
     {% if recent_runs %}
-        {% include "runs/_table.html" with runs=recent_runs %}
+        <ul class="divide-y divide-default rounded-base border border-default bg-neutral-primary-soft shadow-xs">
+            {% for run in recent_runs %}
+                <li>
+                    <a href="{{ run.get_absolute_url }}" class="flex items-center gap-4 px-5 py-3.5 hover:bg-neutral-secondary-medium">
+                        <span class="min-w-0 flex-1">
+                            <span class="block truncate text-sm font-medium text-heading">{{ run.prompt|truncatechars:120 }}</span>
+                            <span class="mt-0.5 block truncate text-xs text-body">{{ run.project.name }} · {{ run.agent.name }} · há {{ run.created_at|timesince }}</span>
+                        </span>
+                        {% include "runs/_status_badge.html" with run=run %}
+                    </a>
+                </li>
+            {% endfor %}
+        </ul>
     {% else %}
         <c-empty-state icon="history" title="Nenhuma execução ainda">As tarefas enviadas aos agentes aparecem aqui.</c-empty-state>
     {% endif %}

@@ -1,9 +1,11 @@
 import os
+from datetime import timedelta
 from unittest import mock
 
 from django.urls import reverse
+from django.utils import timezone
 
-from ..models import Agent, Project, Run
+from ..models import Agent, Approval, Project, Run
 from .base import RunTestCase
 
 
@@ -71,3 +73,38 @@ class OnboardingTests(RunTestCase):
         self.assertIsNone(self.steps())
         self.assertNotContains(self.client.get(reverse("home")), "Primeiros passos")
         self.assertTrue(Run.objects.exists())
+
+
+class HomePanelTests(RunTestCase):
+    def test_stats_are_hidden_until_there_is_a_run(self):
+        page = self.client.get(reverse("home"))
+        self.assertNotIn("stats", page.context)
+        self.assertNotContains(page, "Em andamento")
+
+    def test_stats_count_each_situation(self):
+        now = timezone.now()
+        self.make_run()
+        self.make_run(status=Run.Status.RUNNING)
+        waiting = self.make_run(status=Run.Status.WAITING)
+        Approval.objects.create(run=waiting, tool_call_id="c1", tool_name="run_command", tool_args={})
+        self.make_run(status=Run.Status.SUCCEEDED, finished_at=now - timedelta(days=1))
+        self.make_run(status=Run.Status.SUCCEEDED, finished_at=now - timedelta(days=30))
+        self.make_run(status=Run.Status.FAILED, finished_at=now)
+        self.make_run(status=Run.Status.CANCELED, finished_at=now)
+        page = self.client.get(reverse("home"))
+        self.assertEqual([stat["value"] for stat in page.context["stats"]], [2, 1, 1, 1])
+        self.assertContains(page, "Aguardando aprovação")
+        self.assertContains(page, reverse("orchestrator:approval_list"))
+
+    def test_recent_activity_links_to_each_run_and_to_the_full_list(self):
+        run = self.make_run(prompt="Atualize as dependências")
+        page = self.client.get(reverse("home"))
+        self.assertContains(page, "Atualize as dependências")
+        self.assertContains(page, f'href="{run.get_absolute_url()}"')
+        self.assertContains(page, "Site · Revisor · há")
+        self.assertContains(page, "Ver todas")
+
+    def test_suggestions_appear_only_when_a_task_can_be_sent(self):
+        self.assertContains(self.client.get(reverse("home")), "Rode os testes e corrija o que falhar")
+        self.agent.delete()
+        self.assertNotContains(self.client.get(reverse("home")), "Rode os testes e corrija o que falhar")

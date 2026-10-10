@@ -1,3 +1,5 @@
+from datetime import timedelta
+
 from django.contrib import messages
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.contrib.messages.views import SuccessMessageMixin
@@ -20,6 +22,13 @@ from .workspace import WorkspaceError, list_remote_branches, workspace_path
 # Itens por página nas listas e execuções recentes mostradas na tela inicial
 PAGE_SIZE = 25
 HOME_RECENT_RUNS = 5
+# Exemplos de tarefa na tela inicial: um clique preenche a caixa de texto
+PROMPT_SUGGESTIONS = [
+    "Explique como este projeto está organizado",
+    "Rode os testes e corrija o que falhar",
+    "Procure bugs prováveis e proponha correções",
+    "Atualize o README com o estado atual do código",
+]
 
 
 def enqueue(run, event):
@@ -72,6 +81,9 @@ class HomeView(LoginRequiredMixin, CreateView):
         has_project, has_agent, has_run = Project.objects.exists(), agents.exists(), Run.objects.exists()
         context["can_submit"] = has_project and has_agent
         context["recent_runs"] = Run.objects.select_related("project", "agent")[:HOME_RECENT_RUNS]
+        context["suggestions"] = PROMPT_SUGGESTIONS
+        if has_run:
+            context["stats"] = self.get_stats()
         # id do agente -> variável de ambiente que falta, para avisar antes de a execução falhar
         missing = missing_api_keys()
         context["agents_without_key"] = {
@@ -102,6 +114,39 @@ class HomeView(LoginRequiredMixin, CreateView):
                 },
             ]
         return context
+
+    def get_stats(self):
+        """Números do painel da tela inicial; cada um leva à lista correspondente."""
+        week_ago = timezone.now() - timedelta(days=7)
+        finished = Run.objects.filter(finished_at__gte=week_ago)
+        runs_url, approvals_url = reverse("orchestrator:run_list"), reverse("orchestrator:approval_list")
+        return [
+            {
+                "label": "Em andamento",
+                "value": Run.objects.filter(status__in=[Run.Status.QUEUED, Run.Status.RUNNING]).count(),
+                "icon": "player-play",
+                "url": f"{runs_url}?situacao=ativas",
+            },
+            {
+                "label": "Aguardando aprovação",
+                "value": Approval.objects.filter(status=Approval.Status.PENDING).count(),
+                "icon": "checklist",
+                "url": approvals_url,
+                "attention": True,
+            },
+            {
+                "label": "Concluídas em 7 dias",
+                "value": finished.filter(status=Run.Status.SUCCEEDED).count(),
+                "icon": "circle-check",
+                "url": f"{runs_url}?situacao=finalizadas",
+            },
+            {
+                "label": "Com falha em 7 dias",
+                "value": finished.filter(status=Run.Status.FAILED).count(),
+                "icon": "alert-triangle",
+                "url": f"{runs_url}?situacao=finalizadas",
+            },
+        ]
 
     def form_valid(self, form):
         form.instance.created_by = self.request.user
