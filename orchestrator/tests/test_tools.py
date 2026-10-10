@@ -145,9 +145,21 @@ class PullRequestToolTests(RunTestCase):
         self.run_.refresh_from_db()
         self.assertEqual(self.run_.pull_request_url, "")
 
-    def test_requires_token_and_github_repository(self):
-        with self.settings(GITHUB_TOKEN=""), self.assertRaisesMessage(ToolError, "GITHUB_TOKEN"):
-            self.open_pr()
+    def test_without_token_the_branch_is_pushed_and_the_agent_gets_a_link_to_open_the_pull_request(self):
+        self.tools["write_file"].invoke({"path": "a.txt", "content": "1"})
+        with self.settings(GITHUB_TOKEN=""):
+            result, post = self.open_pr()
+        post.assert_not_called()
+        self.assertIn("a.txt", git("show", "--stat", self.run_.branch, cwd=self.remote))
+        link = f"https://github.com/org/site/compare/main...{self.run_.branch}?expand=1"
+        self.assertIn(link + "&title=Adiciona+p%C3%A1gina&body=Detalhes", result)
+        self.assertEqual((self.run_.pull_request_url, self.run_.compare_url), ("", link))
+        self.assertIsNotNone(Run.objects.get(pk=self.run_.pk).pushed_at)
+
+    def test_outside_github_the_branch_is_only_pushed(self):
         self.run_.project.repo_url = "https://gitlab.com/org/site.git"
-        with self.assertRaisesMessage(ToolError, "GitHub"):
-            self.open_pr()
+        self.tools["write_file"].invoke({"path": "a.txt", "content": "1"})
+        result, post = self.open_pr()
+        post.assert_not_called()
+        self.assertEqual(result, f"Branch {self.run_.branch} enviada para o repositório.")
+        self.assertEqual(self.run_.compare_url, "")

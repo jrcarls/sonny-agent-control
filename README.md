@@ -31,7 +31,7 @@ variável `COMPOSE_FILE`.
 ### Desenvolvimento
 
 ```bash
-cp .env.example .env     # preencha a chave do provedor de LLM e, para repositórios privados, o GITHUB_TOKEN
+cp .env.example .env     # preencha a chave do provedor de LLM
 docker compose up        # interface em http://localhost:8000
 ```
 
@@ -79,7 +79,7 @@ Tudo vem de variáveis de ambiente, lidas do `.env`. As principais:
 | Variável | Para que serve |
 |---|---|
 | `ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, `GOOGLE_API_KEY` | Chave de cada provedor de LLM usado pelos agentes |
-| `GITHUB_TOKEN` | Abrir pull requests pela API do GitHub |
+| `GITHUB_TOKEN` | Opcional: abrir pull requests pela API do GitHub (veja "Acesso aos repositórios") |
 | `DATABASE_URL`, `CELERY_BROKER_URL` | Postgres e Redis (o padrão aponta para o `docker compose`) |
 | `CELERY_WORKER_CONCURRENCY` | Quantas execuções rodam ao mesmo tempo (padrão 2) |
 | `RUN_MAX_TOKENS` | Teto de tokens por execução, somando todos os agentes; 0 desliga |
@@ -89,8 +89,16 @@ Os demais limites e prazos de operação (tempo máximo de um comando, tamanho d
 por execução etc.) estão reunidos na seção "Orquestrador" do `config/settings.py`, e cada um aceita uma variável
 de ambiente de mesmo nome.
 
-No Docker, o worker clona e envia código para o GitHub com o `GITHUB_TOKEN`. Fora do Docker, usa as
-credenciais git da máquina (chave SSH ou credential helper).
+### Acesso aos repositórios
+
+Cada projeto tem um par de chaves SSH próprio, gerado pelo sistema. A tela do projeto mostra a chave pública:
+cadastre-a no repositório (no GitHub, em *Settings → Deploy keys*, com *Allow write access*) e use o endereço
+SSH (`git@github.com:organizacao/repositorio.git`) no projeto. O botão "Testar acesso" confere a leitura.
+A chave privada fica no banco, criptografada com a `SECRET_KEY`: se a `SECRET_KEY` mudar, gere chaves novas.
+
+O `GITHUB_TOKEN` é opcional. Com ele, os agentes abrem o pull request sozinhos e os endereços `https` do
+GitHub também funcionam em repositórios privados. Sem ele, o agente envia a branch e entrega o link para
+você abrir o pull request.
 
 ## Como funciona
 

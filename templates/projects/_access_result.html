@@ -1,0 +1,17 @@
+{# Resultado do botão "Testar acesso" do projeto, trocado no lugar pelo htmx #}
+{% if error %}
+    <div class="rounded-base bg-danger-soft p-4 text-sm text-fg-danger-strong" role="alert">
+        <p class="font-medium">O sistema não conseguiu acessar o repositório</p>
+        <p class="mt-1 whitespace-pre-wrap break-words">{{ error }}</p>
+    </div>
+{% elif has_default_branch %}
+    <div class="rounded-base bg-success-soft p-4 text-sm text-fg-success-strong" role="status">
+        <p class="font-medium">Acesso de leitura confirmado</p>
+        <p class="mt-1">O repositório tem {{ branches|length }} branch{{ branches|length|pluralize:"es" }}, incluindo <code class="font-mono">{{ project.default_branch }}</code>. Este teste não verifica a permissão de escrita.</p>
+    </div>
+{% else %}
+    <div class="rounded-base bg-warning-soft p-4 text-sm text-fg-warning" role="alert">
+        <p class="font-medium">O repositório foi acessado, mas a branch padrão não existe nele</p>
+        <p class="mt-1">Não há branch <code class="font-mono">{{ project.default_branch }}</code>. Branches encontradas: {{ branches|join:", "|default:"nenhuma" }}.</p>
+    </div>
+{% endif %}

@@ -1,0 +1,11 @@
+{# Conteúdo do modal de novo projeto. Com erro de validação, o htmx troca o conteúdo do modal por este mesmo trecho. #}
+<h2 id="project-modal-title" class="mb-5 pr-8 text-lg font-semibold text-heading">Novo projeto</h2>
+<form hx-post="{% url 'orchestrator:project_create' %}" hx-target="#project-modal-body" hx-disabled-elt="find button[type=submit]"
+      method="post" action="{% url 'orchestrator:project_create' %}" novalidate>
+    {% csrf_token %}
+    <c-fields :form="form" />
+    <div class="mt-6 flex items-center gap-3">
+        <c-button type="submit">Salvar</c-button>
+        <c-button variant="secondary" type="button" @click="close()">Cancelar</c-button>
+    </div>
+</form>

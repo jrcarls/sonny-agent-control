@@ -7,7 +7,7 @@
         <span>Criada em {{ run.created_at|date:"d/m/Y H:i" }}</span>
         {% if run.finished_at %}<span>Finalizada em {{ run.finished_at|date:"d/m/Y H:i" }}</span>{% endif %}
         <span>Branch <code class="font-mono text-heading">{{ run.branch }}</code></span>
-        {% if run.pull_request_url %}<a href="{{ run.pull_request_url }}" class="font-medium text-fg-brand hover:underline" target="_blank" rel="noopener">Ver pull request</a>{% endif %}
+        {% if run.pull_request_url %}<a href="{{ run.pull_request_url }}" class="font-medium text-fg-brand hover:underline" target="_blank" rel="noopener">Ver pull request</a>{% elif run.compare_url %}<a href="{{ run.compare_url }}" class="font-medium text-fg-brand hover:underline" target="_blank" rel="noopener">Abrir pull request no GitHub</a>{% endif %}
         {% if run.total_tokens %}<span>{{ run.input_tokens }} tokens de entrada, {{ run.output_tokens }} de saída</span>{% endif %}
     </div>
 

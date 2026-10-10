@@ -4,17 +4,16 @@
 {% block title %}Projetos{% endblock %}
 
 {% block content %}
-{# open: modal de novo projeto visível. Ao abrir, o foco vai para o primeiro campo; ao fechar, volta ao botão. #}
+{# Criar e editar projeto abrem neste modal: o htmx busca o conteúdo e, quando ele chega, o modal aparece. #}
 <div class="py-6"
      x-data="{
-       open: {{ open_modal|yesno:'true,false' }},
-       show() { this.open = true; this.$nextTick(() => this.$refs.dialog.querySelector('input[type=text]').focus()) },
-       close() { this.open = false; this.$refs.trigger.focus() }
+       open: false,
+       close() { this.open = false; history.replaceState(null, '', location.pathname) }
      }"
-     x-init="if (open) show()" @keydown.escape.window="if (open) close()">
+     @keydown.escape.window="if (open) close()">
     <div class="mb-6 flex items-center justify-between">
         <h1 class="text-2xl font-semibold tracking-tight text-heading">Projetos</h1>
-        <c-button href="{% url 'orchestrator:project_create' %}" x-ref="trigger" @click.prevent="show()">
+        <c-button href="{% url 'orchestrator:project_create' %}" hx-get="{% url 'orchestrator:project_create' %}" hx-target="#project-modal-body">
             {% tabler_icon "plus" "me-1.5 h-4 w-4" %}
             Novo projeto
         </c-button>
@@ -33,7 +32,7 @@
                     {% for project in projects %}
                         <tr class="border-b border-default last:border-0">
                             <th scope="row" class="whitespace-nowrap px-6 py-4 font-medium text-heading">
-                                <a href="{{ project.get_absolute_url }}" class="hover:underline">{{ project.name }}</a>
+                                <a href="{{ project.get_absolute_url }}" hx-get="{{ project.get_absolute_url }}" hx-target="#project-modal-body" class="hover:underline">{{ project.name }}</a>
                             </th>
                             <td class="px-6 py-4">{{ project.repo_url }}</td>
                             <td class="px-6 py-4">{{ project.default_branch }}</td>
@@ -45,18 +44,17 @@
     {% else %}
         <c-empty-state icon="folders" title="Nenhum projeto ainda">Adicione o repositório em que os agentes vão trabalhar.</c-empty-state>
     {% endif %}
-    <div x-cloak x-show="open" class="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-gray-900/50 p-4 sm:items-center"
+    <div x-cloak x-show="open" class="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-gray-900/50 p-4"
          @click.self="close()">
-        <div x-ref="dialog" role="dialog" aria-modal="true" aria-labelledby="new-project-title"
-             class="w-full max-w-xl rounded-base border border-default bg-neutral-primary-soft p-6 shadow-lg">
-            <div class="mb-5 flex items-center justify-between">
-                <h2 id="new-project-title" class="text-lg font-semibold text-heading">Novo projeto</h2>
-                <button type="button" @click="close()" class="cursor-pointer rounded-base p-1 text-body hover:bg-neutral-tertiary hover:text-heading">
-                    <span class="sr-only">Fechar</span>
-                    {% tabler_icon "x" "h-5 w-5" %}
-                </button>
-            </div>
-            {% include "projects/_create_form.html" %}
+        <div role="dialog" aria-modal="true" aria-labelledby="project-modal-title"
+             class="relative my-8 w-full max-w-2xl rounded-base border border-default bg-neutral-primary-soft p-6 shadow-lg">
+            <button type="button" @click="close()" class="absolute right-4 top-4 cursor-pointer rounded-base p-1 text-body hover:bg-neutral-tertiary hover:text-heading">
+                <span class="sr-only">Fechar</span>
+                {% tabler_icon "x" "h-5 w-5" %}
+            </button>
+            {# O modal abre quando o conteúdo chega; trocas internas (como o resultado do teste de acesso) não mexem no foco #}
+            <div id="project-modal-body" {% if modal_url %}hx-get="{{ modal_url }}" hx-trigger="load"{% endif %}
+                 @htmx:after-swap="if ($event.target === $el) { open = true; $nextTick(() => $el.querySelector('input[type=text]')?.focus()) }"></div>
         </div>
     </div>
 </div>

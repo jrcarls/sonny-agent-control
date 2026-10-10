@@ -14,7 +14,7 @@ from .forms import AgentForm, ProjectForm, RunForm
 from .models import Agent, Approval, Project, Run, RunEvent
 from .providers import MODEL_SUGGESTIONS, ModelListError, check_model, list_models, missing_api_keys
 from .tasks import execute_run
-from .workspace import workspace_path
+from .workspace import WorkspaceError, list_remote_branches, workspace_path
 
 
 # Itens por página nas listas e execuções recentes mostradas na tela inicial
@@ -116,37 +116,94 @@ class ProjectListView(LoginRequiredMixin, ListView):
     context_object_name = "projects"
 
     def get_context_data(self, **kwargs):
-        # O formulário de novo projeto abre em um modal nesta tela; ?novo=1 já chega com ele aberto
-        return super().get_context_data(**kwargs, form=ProjectForm(), open_modal="novo" in self.request.GET)
+        # Criar e editar projeto acontecem em um modal nesta tela. ?novo=1 e ?editar=<id> já chegam
+        # com ele aberto: o conteúdo é buscado no endereço abaixo assim que a página carrega.
+        params, modal_url = self.request.GET, None
+        if "novo" in params:
+            modal_url = reverse("orchestrator:project_create")
+        elif params.get("editar", "").isdigit():
+            modal_url = reverse("orchestrator:project_update", args=[params["editar"]])
+        return super().get_context_data(**kwargs, modal_url=modal_url)
 
 
-class ProjectCreateView(LoginRequiredMixin, SuccessMessageMixin, CreateView):
-    """Recebe o formulário do modal de novo projeto (via htmx) na lista de projetos."""
+class ProjectModalMixin:
+    """Formulário de projeto dentro do modal da lista: ao htmx devolve só o conteúdo do modal.
+
+    Sem htmx (endereço aberto direto, ou navegador sem JavaScript), o GET leva para a lista com o modal
+    aberto e o POST com erro cai em uma página simples com o mesmo formulário.
+    """
 
     model = Project
     form_class = ProjectForm
-    template_name = "projects/form.html"
-    success_url = reverse_lazy("orchestrator:project_list")
-    success_message = "Projeto “%(name)s” criado."
+    modal_template = None
+
+    def modal_page_url(self):
+        raise NotImplementedError
 
     def get(self, request, *args, **kwargs):
-        return redirect(f"{self.success_url}?novo=1")
+        if not request.htmx:
+            return redirect(self.modal_page_url())
+        return super().get(request, *args, **kwargs)
 
     def get_template_names(self):
-        # No modal, erros de validação voltam só com o formulário, que o htmx troca no lugar
-        return ["projects/_create_form.html"] if self.request.htmx else super().get_template_names()
+        return [self.modal_template] if self.request.htmx else ["projects/form.html"]
+
+    def get_context_data(self, **kwargs):
+        return super().get_context_data(**kwargs, modal_template=self.modal_template)
 
     def form_valid(self, form):
         response = super().form_valid(form)
-        return HttpResponseClientRedirect(self.success_url) if self.request.htmx else response
+        return HttpResponseClientRedirect(self.get_success_url()) if self.request.htmx else response
 
 
-class ProjectUpdateView(LoginRequiredMixin, SuccessMessageMixin, UpdateView):
-    model = Project
-    form_class = ProjectForm
-    template_name = "projects/form.html"
+class ProjectCreateView(LoginRequiredMixin, ProjectModalMixin, SuccessMessageMixin, CreateView):
+    modal_template = "projects/_modal_create.html"
+    success_message = "Projeto “%(name)s” criado. Se o repositório for privado, cadastre nele a chave do projeto."
+
+    def modal_page_url(self):
+        return reverse("orchestrator:project_list") + "?novo=1"
+
+    def get_success_url(self):
+        # Reabre o modal no projeto recém-criado, onde está a chave pública a cadastrar no repositório
+        return f"{reverse('orchestrator:project_list')}?editar={self.object.pk}"
+
+
+class ProjectUpdateView(LoginRequiredMixin, ProjectModalMixin, SuccessMessageMixin, UpdateView):
+    modal_template = "projects/_modal_edit.html"
     success_url = reverse_lazy("orchestrator:project_list")
     success_message = "Projeto “%(name)s” atualizado."
+
+    def modal_page_url(self):
+        return f"{reverse('orchestrator:project_list')}?editar={self.kwargs['pk']}"
+
+    def get_object(self, queryset=None):
+        project = super().get_object(queryset)
+        if not project.ssh_public_key:
+            project.save()  # projetos criados antes das chaves existirem ganham a sua ao abrir o modal
+        return project
+
+
+class ProjectAccessTestView(LoginRequiredMixin, View):
+    """Confere se o sistema alcança o repositório do projeto, com o endereço e a chave que estão salvos."""
+
+    def post(self, request, pk):
+        project = get_object_or_404(Project, pk=pk)
+        context = {"project": project}
+        try:
+            context["branches"] = branches = list_remote_branches(project)
+            context["has_default_branch"] = project.default_branch in branches
+        except WorkspaceError as exc:
+            context["error"] = str(exc)
+        return render(request, "projects/_access_result.html", context)
+
+
+class ProjectKeyRegenerateView(LoginRequiredMixin, View):
+    def post(self, request, pk):
+        project = get_object_or_404(Project, pk=pk)
+        project.generate_ssh_key()
+        project.save()
+        messages.success(request, "Chave nova gerada. A anterior deixou de valer: cadastre a nova no repositório.")
+        return redirect(project)
 
 
 class ProjectDeleteView(LoginRequiredMixin, ProtectedDeleteMixin, SuccessMessageMixin, DeleteView):

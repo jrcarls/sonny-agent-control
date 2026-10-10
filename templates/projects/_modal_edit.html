@@ -1,0 +1,49 @@
+{# Conteúdo do modal de edição de projeto: os dados e, abaixo, a chave de acesso ao repositório. #}
+<h2 id="project-modal-title" class="mb-5 pr-8 text-lg font-semibold text-heading">Editar projeto</h2>
+<form hx-post="{{ object.get_absolute_url }}" hx-target="#project-modal-body" hx-disabled-elt="find button[type=submit]"
+      method="post" action="{{ object.get_absolute_url }}" novalidate>
+    {% csrf_token %}
+    <c-fields :form="form" />
+    <div class="mt-6 flex items-center gap-3">
+        <c-button type="submit">Salvar</c-button>
+        <c-button variant="secondary" type="button" @click="close()">Cancelar</c-button>
+        <a href="{% url 'orchestrator:project_delete' object.pk %}" class="ms-auto text-sm font-medium text-fg-danger-strong hover:underline">Excluir</a>
+    </div>
+</form>
+
+<section class="mt-8 border-t border-default pt-6">
+    <h3 class="mb-1 text-base font-semibold text-heading">Acesso ao repositório</h3>
+    <p class="mb-4 text-sm text-body">
+        Esta é a chave pública deste projeto. Para os agentes acessarem um repositório privado, cadastre-a nele:
+        no GitHub, em <span class="font-medium text-heading">Settings → Deploy keys → Add deploy key</span>,
+        cole a chave e marque <span class="font-medium text-heading">Allow write access</span>, para os agentes
+        conseguirem enviar branches.
+    </p>
+    <div x-data="{ copied: false }">
+        <label for="ssh-public-key" class="sr-only">Chave pública</label>
+        <textarea id="ssh-public-key" x-ref="key" readonly rows="3" @focus="$el.select()"
+                  class="block w-full resize-none rounded-base border border-default-medium bg-neutral-secondary-medium px-3 py-2.5 font-mono text-xs text-heading">{{ object.ssh_public_key }}</textarea>
+        <div class="mt-3 flex flex-wrap items-center gap-3">
+            <c-button variant="secondary" size="sm" @click="navigator.clipboard.writeText($refs.key.value); copied = true; setTimeout(() => copied = false, 2000)">
+                <span x-text="copied ? 'Copiada' : 'Copiar chave'">Copiar chave</span>
+            </c-button>
+            <c-button variant="secondary" size="sm" hx-post="{% url 'orchestrator:project_access_test' object.pk %}" hx-target="#access-result"
+                      hx-headers='{"X-CSRFToken": "{{ csrf_token }}"}' hx-disabled-elt="this" hx-indicator="#access-wait">Testar acesso</c-button>
+            <span id="access-wait" class="htmx-indicator text-sm text-body">Consultando o repositório…</span>
+            <form method="post" action="{% url 'orchestrator:project_key_regenerate' object.pk %}" class="ms-auto"
+                  onsubmit="return confirm('Gerar uma chave nova? A chave atual deixa de valer e precisa ser trocada no repositório.')">
+                {% csrf_token %}
+                <button type="submit" class="cursor-pointer text-sm font-medium text-body hover:text-heading hover:underline">Gerar nova chave</button>
+            </form>
+        </div>
+    </div>
+    <div id="access-result" class="mt-3" aria-live="polite"></div>
+    <p class="mt-4 text-sm text-body">
+        {% if object.uses_ssh %}
+            O teste usa o endereço e a branch que estão salvos; salve antes de testar uma mudança.
+        {% else %}
+            O endereço deste projeto não é SSH, então a chave não é usada. Para usá-la, troque o endereço para o formato
+            <code class="font-mono">git@github.com:organizacao/repositorio.git</code>.
+        {% endif %}
+    </p>
+</section>

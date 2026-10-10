@@ -1,13 +1,11 @@
 #!/bin/sh
 set -e
 
-# Com GITHUB_TOKEN definido, o git usa o token para clonar e enviar para qualquer repositório
-# do GitHub, tanto por endereço https quanto por endereço ssh, sem precisar de chave SSH.
+# Endereços SSH (git@…) usam a chave do próprio projeto, cadastrada no repositório.
+# Com GITHUB_TOKEN definido, os endereços https do GitHub passam a usar o token.
 if [ -n "$GITHUB_TOKEN" ]; then
-    authenticated="https://x-access-token:${GITHUB_TOKEN}@github.com/"
-    git config --global --replace-all url."$authenticated".insteadOf "https://github.com/"
-    git config --global --add url."$authenticated".insteadOf "git@github.com:"
-    git config --global --add url."$authenticated".insteadOf "ssh://git@github.com/"
+    git config --global --replace-all \
+        url."https://x-access-token:${GITHUB_TOKEN}@github.com/".insteadOf "https://github.com/"
 fi
 
 exec "$@"

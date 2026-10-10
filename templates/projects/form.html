@@ -1,20 +1,10 @@
 {% extends "layouts/app.html" %}
+{# Só aparece sem htmx (navegador sem JavaScript): o normal é este formulário abrir no modal da lista de projetos. #}
 
 {% block title %}{% if object %}Editar projeto{% else %}Novo projeto{% endif %}{% endblock %}
 
 {% block content %}
-<div class="max-w-3xl py-6">
-    <h1 class="mb-6 text-2xl font-semibold tracking-tight text-heading">{% if object %}Editar projeto{% else %}Novo projeto{% endif %}</h1>
-    <form method="post" novalidate>
-        {% csrf_token %}
-        <c-fields :form="form" />
-        <div class="mt-6 flex items-center gap-3">
-            <c-button type="submit">Salvar</c-button>
-            <c-button variant="secondary" href="{% url 'orchestrator:project_list' %}">Cancelar</c-button>
-            {% if object %}
-                <a href="{% url 'orchestrator:project_delete' object.pk %}" class="ms-auto text-sm font-medium text-fg-danger-strong hover:underline">Excluir</a>
-            {% endif %}
-        </div>
-    </form>
+<div id="project-modal-body" class="max-w-3xl py-6" x-data="{ close() { location.href = '{% url 'orchestrator:project_list' %}' } }">
+    {% include modal_template %}
 </div>
 {% endblock %}

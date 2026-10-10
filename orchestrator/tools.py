@@ -3,9 +3,11 @@
 import os
 import subprocess
 from dataclasses import dataclass
+from urllib.parse import urlencode
 
 import httpx
 from django.conf import settings
+from django.utils import timezone
 from langchain_core.tools import tool
 
 from .workspace import git
@@ -30,7 +32,7 @@ TOOL_SPECS = {
     ),
     "open_pull_request": ToolSpec(
         "Abrir pull request",
-        "Faz commit, envia a branch e abre um PR no GitHub.",
+        "Faz commit e envia a branch. Com GITHUB_TOKEN abre o PR; sem ele, entrega o link para você abrir.",
         "Ações sensíveis",
         requires_approval=True,
     ),
@@ -61,12 +63,12 @@ def _resolve(workspace, path):
     return target
 
 
-def _github_repo(repo_url):
-    """'org/repo' a partir de https://github.com/org/repo(.git) ou git@github.com:org/repo(.git)."""
+def github_repository(repo_url):
+    """'org/repo' a partir de um endereço https ou ssh do GitHub; None se o repositório não é de lá."""
     for prefix in ("https://github.com/", "git@github.com:", "ssh://git@github.com/"):
         if repo_url.startswith(prefix):
             return repo_url.removeprefix(prefix).removesuffix("/").removesuffix(".git")
-    raise ToolError("Só é possível abrir pull request em repositórios do GitHub.")
+    return None
 
 
 def build_tools(run, workspace, agent):
@@ -140,25 +142,32 @@ def build_tools(run, workspace, agent):
 
     @tool
     def open_pull_request(title: str, body: str = "") -> str:
-        """Faz commit de todas as alterações, envia a branch e abre um pull request no GitHub.
+        """Faz commit de todas as alterações e envia a branch para o repositório, para virar um pull request.
 
-        Se a execução já tiver um pull request aberto, só envia os novos commits para ele.
+        Se o servidor tiver acesso à API do GitHub, o pull request é aberto na hora. Senão, a resposta traz
+        o link para a pessoa abri-lo: repasse esse link na sua resposta final. Chamar de novo depois de
+        mais alterações só envia os novos commits.
         """
         project = run.project
-        repository = _github_repo(project.repo_url)
-        if not settings.GITHUB_TOKEN:
-            raise ToolError("GITHUB_TOKEN não está configurado no servidor.")
-
         git("add", "-A", cwd=workspace)
         if git("status", "--porcelain", cwd=workspace).strip():
             identity = ["-c", f"user.name={settings.AGENT_GIT_NAME}", "-c", f"user.email={settings.AGENT_GIT_EMAIL}"]
             git(*identity, "commit", "-m", title, cwd=workspace)
         if git("rev-list", "--count", f"origin/{project.default_branch}..HEAD", cwd=workspace).strip() == "0":
             raise ToolError("Não há alterações para enviar.")
-        git("push", "origin", f"HEAD:refs/heads/{run.branch}", cwd=workspace)
+        git("push", "origin", f"HEAD:refs/heads/{run.branch}", cwd=workspace, project=project)
+        run.pushed_at = timezone.now()
+        run.save(update_fields=["pushed_at"])
 
         if run.pull_request_url:
             return f"Pull request atualizado: {run.pull_request_url}"
+        repository = github_repository(project.repo_url)
+        if repository is None:
+            return f"Branch {run.branch} enviada para o repositório."
+        if not settings.GITHUB_TOKEN:
+            link = f"{run.compare_url}&{urlencode({'title': title, 'body': body})}"
+            return f"Branch {run.branch} enviada. O pull request ainda não foi aberto; para abri-lo, acesse: {link}"
+
         response = httpx.post(
             f"https://api.github.com/repos/{repository}/pulls",
             headers={"Authorization": f"Bearer {settings.GITHUB_TOKEN}", "Accept": "application/vnd.github+json"},

@@ -9,8 +9,11 @@ class ProjectForm(forms.ModelForm):
         model = Project
         fields = ["name", "repo_url", "default_branch", "description"]
         widgets = {
-            "repo_url": forms.TextInput(attrs={"placeholder": "https://github.com/org/repo.git"}),
+            "repo_url": forms.TextInput(attrs={"placeholder": "git@github.com:org/repo.git"}),
             "description": forms.Textarea(attrs={"rows": 3}),
+        }
+        help_texts = {
+            "repo_url": "Para repositório privado, use o endereço SSH (git@…) e cadastre nele a chave do projeto.",
         }
 
 

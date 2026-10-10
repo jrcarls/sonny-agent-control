@@ -119,8 +119,9 @@ CELERY_BEAT_SCHEDULE = {
 WORKSPACES_DIR = Path(env("WORKSPACES_DIR", default=BASE_DIR / ".workspaces"))
 # Dias que o worktree de uma execução finalizada fica guardado antes da limpeza
 WORKSPACE_RETENTION_DAYS = env.int("WORKSPACE_RETENTION_DAYS", default=7)
-# Prazo, em segundos, de cada comando git (clone, fetch, push)
+# Prazo, em segundos, de cada comando git (clone, fetch, push) e do botão "Testar acesso" do projeto
 GIT_TIMEOUT = env.int("GIT_TIMEOUT", default=600)
+REPOSITORY_TEST_TIMEOUT = env.int("REPOSITORY_TEST_TIMEOUT", default=20)
 # Autor dos commits feitos pelos agentes e token usado para abrir pull requests
 AGENT_GIT_NAME = env("AGENT_GIT_NAME", default="IzzyOne Agent")
 AGENT_GIT_EMAIL = env("AGENT_GIT_EMAIL", default="agent@izzyone.local")

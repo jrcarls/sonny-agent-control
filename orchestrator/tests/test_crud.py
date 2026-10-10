@@ -6,6 +6,9 @@ from ..models import Agent, Project
 from .base import RunTestCase
 
 
+HTMX = {"HX-Request": "true"}
+
+
 class LoginRequiredTests(TestCase):
     def test_anonymous_is_redirected_to_login(self):
         for name in ["home", "orchestrator:project_list", "orchestrator:agent_create", "orchestrator:run_list"]:
@@ -29,9 +32,12 @@ class ProjectViewTests(TestCase):
             {"name": "Site", "repo_url": "git@github.com:org/site.git", "default_branch": "main", "description": ""},
             follow=True,
         )
-        self.assertRedirects(response, reverse("orchestrator:project_list"))
+        # Volta para a lista com o modal do projeto novo aberto, onde está a chave a cadastrar no repositório
+        project = Project.objects.get()
+        self.assertRedirects(response, f"{reverse('orchestrator:project_list')}?editar={project.pk}")
         self.assertContains(response, "git@github.com:org/site.git")
         self.assertContains(response, "criado")
+        self.assertContains(response, f'hx-get="{project.get_absolute_url()}" hx-trigger="load"')
 
     def test_create_requires_repo(self):
         response = self.client.post(reverse("orchestrator:project_create"), {"name": "Site", "default_branch": "main"})
@@ -39,49 +45,79 @@ class ProjectViewTests(TestCase):
         self.assertFalse(Project.objects.exists())
         self.assertContains(response, "Este campo é obrigatório")
 
-    def test_new_project_form_lives_in_a_modal_on_the_list(self):
+    def test_forms_live_in_a_modal_on_the_list(self):
+        project = Project.objects.create(name="Site", repo_url="https://example.com/a.git")
         url = reverse("orchestrator:project_list")
         page = self.client.get(url)
-        self.assertTemplateUsed(page, "projects/_create_form.html")
         self.assertContains(page, 'role="dialog"')
-        self.assertContains(page, "open: false")
-        self.assertContains(self.client.get(url, {"novo": "1"}), "open: true")
-        # O endereço antigo da página de criação leva para a lista com o modal aberto
+        self.assertContains(page, 'id="project-modal-body"')
+        self.assertNotContains(page, 'hx-trigger="load"')
+        # Os endereços dos formulários, abertos direto, levam para a lista com o modal aberto
         self.assertRedirects(self.client.get(reverse("orchestrator:project_create")), url + "?novo=1")
+        self.assertRedirects(self.client.get(project.get_absolute_url()), f"{url}?editar={project.pk}")
+        self.assertContains(self.client.get(url, {"novo": "1"}), f'hx-get="{reverse("orchestrator:project_create")}" hx-trigger="load"')
+        self.assertContains(self.client.get(url, {"editar": project.pk}), f'hx-get="{project.get_absolute_url()}" hx-trigger="load"')
+        self.assertNotContains(self.client.get(url, {"editar": "x"}), 'hx-trigger="load"')
 
-    def test_modal_submit_redirects_the_browser_to_the_list(self):
+    def test_modal_content_is_fetched_by_htmx(self):
+        project = Project.objects.create(name="Site", repo_url="https://example.com/a.git")
+        new = self.client.get(reverse("orchestrator:project_create"), headers=HTMX)
+        self.assertTemplateUsed(new, "projects/_modal_create.html")
+        self.assertTemplateNotUsed(new, "layouts/app.html")
+        self.assertContains(new, "Novo projeto")
+        edit = self.client.get(project.get_absolute_url(), headers=HTMX)
+        self.assertTemplateUsed(edit, "projects/_modal_edit.html")
+        self.assertTemplateNotUsed(edit, "layouts/app.html")
+        self.assertContains(edit, 'value="https://example.com/a.git"')
+        self.assertContains(edit, "Acesso ao repositório")
+        self.assertContains(edit, "Excluir")
+
+    def test_modal_create_redirects_the_browser_to_the_new_project(self):
         response = self.client.post(
             reverse("orchestrator:project_create"),
             {"name": "Site", "repo_url": "git@github.com:org/site.git", "default_branch": "main"},
-            headers={"HX-Request": "true"},
+            headers=HTMX,
         )
-        self.assertEqual(response["HX-Redirect"], reverse("orchestrator:project_list"))
-        self.assertTrue(Project.objects.filter(name="Site").exists())
-        self.assertContains(self.client.get(reverse("orchestrator:project_list")), "criado")
+        project = Project.objects.get(name="Site")
+        self.assertEqual(response["HX-Redirect"], f"{reverse('orchestrator:project_list')}?editar={project.pk}")
 
-    def test_modal_errors_come_back_as_just_the_form(self):
+    def test_modal_errors_come_back_as_just_the_modal_content(self):
         response = self.client.post(
-            reverse("orchestrator:project_create"),
-            {"name": "Site", "default_branch": "main"},
-            headers={"HX-Request": "true"},
+            reverse("orchestrator:project_create"), {"name": "Site", "default_branch": "main"}, headers=HTMX
         )
         self.assertEqual(response.status_code, 200)
-        self.assertTemplateUsed(response, "projects/_create_form.html")
+        self.assertTemplateUsed(response, "projects/_modal_create.html")
         self.assertTemplateNotUsed(response, "layouts/app.html")
         self.assertContains(response, "Este campo é obrigatório")
         self.assertContains(response, 'value="Site"')
         self.assertFalse(Project.objects.exists())
 
-    def test_update(self):
+    def test_modal_update(self):
         project = Project.objects.create(name="Site", repo_url="https://example.com/a.git")
-        response = self.client.get(project.get_absolute_url())
-        self.assertContains(response, 'value="https://example.com/a.git"')
-        self.client.post(
+        invalid = self.client.post(project.get_absolute_url(), {"name": "", "repo_url": "x"}, headers=HTMX)
+        self.assertTemplateUsed(invalid, "projects/_modal_edit.html")
+        self.assertContains(invalid, "Este campo é obrigatório")
+        self.assertContains(invalid, "Acesso ao repositório")
+        response = self.client.post(
             project.get_absolute_url(),
             {"name": "Site", "repo_url": "https://example.com/b.git", "default_branch": "develop", "description": "x"},
+            headers=HTMX,
         )
+        self.assertEqual(response["HX-Redirect"], reverse("orchestrator:project_list"))
         project.refresh_from_db()
         self.assertEqual((project.repo_url, project.default_branch), ("https://example.com/b.git", "develop"))
+        self.assertContains(self.client.get(reverse("orchestrator:project_list")), "atualizado")
+
+    def test_update_without_javascript_still_works(self):
+        project = Project.objects.create(name="Site", repo_url="https://example.com/a.git")
+        invalid = self.client.post(project.get_absolute_url(), {"name": ""})
+        self.assertTemplateUsed(invalid, "projects/form.html")
+        self.assertContains(invalid, "Este campo é obrigatório")
+        response = self.client.post(
+            project.get_absolute_url(), {"name": "Novo nome", "repo_url": "https://example.com/a.git", "default_branch": "main"}
+        )
+        self.assertRedirects(response, reverse("orchestrator:project_list"))
+        self.assertEqual(Project.objects.get().name, "Novo nome")
 
     def test_delete(self):
         project = Project.objects.create(name="Site", repo_url="https://example.com/a.git")

@@ -3,7 +3,8 @@ from django.db import models
 from django.urls import reverse
 from django.utils import timezone
 
-from .tools import TOOL_SPECS
+from .crypto import encrypt, generate_ssh_keypair
+from .tools import TOOL_SPECS, github_repository
 
 
 class Project(models.Model):
@@ -12,6 +13,10 @@ class Project(models.Model):
     repo_url = models.CharField("repositório", max_length=255)
     default_branch = models.CharField("branch padrão", max_length=100, default="main")
     description = models.TextField("descrição", blank=True)
+    # Par de chaves SSH do projeto. A pública é cadastrada no repositório (deploy key no GitHub);
+    # a privada fica criptografada e só é usada pelo git ao clonar e enviar.
+    ssh_private_key = models.TextField(blank=True, editable=False)
+    ssh_public_key = models.TextField("chave pública", blank=True, editable=False)
     created_at = models.DateTimeField("criado em", auto_now_add=True)
     updated_at = models.DateTimeField("atualizado em", auto_now=True)
 
@@ -22,6 +27,24 @@ class Project(models.Model):
 
     def __str__(self):
         return self.name
+
+    def save(self, *args, update_fields=None, **kwargs):
+        # Todo projeto tem uma chave: é gerada na criação e também para os que vieram de antes dela existir
+        if not self.ssh_private_key:
+            self.generate_ssh_key()
+            if update_fields is not None:
+                update_fields = {*update_fields, "ssh_private_key", "ssh_public_key"}
+        super().save(*args, update_fields=update_fields, **kwargs)
+
+    def generate_ssh_key(self):
+        """Troca o par de chaves (sem salvar). A chave anterior deixa de valer para este projeto."""
+        private, self.ssh_public_key = generate_ssh_keypair(f"izzyone-{self.name}".replace(" ", "-"))
+        self.ssh_private_key = encrypt(private)
+
+    @property
+    def uses_ssh(self):
+        """Só endereços SSH usam a chave do projeto; https e caminhos locais não."""
+        return self.repo_url.startswith(("git@", "ssh://"))
 
     def get_absolute_url(self):
         return reverse("orchestrator:project_update", args=[self.pk])
@@ -77,6 +100,8 @@ class Run(models.Model):
     status = models.CharField("situação", max_length=20, choices=Status, default=Status.QUEUED)
     result = models.TextField("resultado", blank=True)
     pull_request_url = models.URLField("pull request", blank=True)
+    # Última vez que a branch da execução foi enviada ao repositório remoto
+    pushed_at = models.DateTimeField("enviada em", null=True, blank=True)
     # Pedido de cancelamento de uma execução em andamento; o worker para no fim do passo atual
     cancel_requested = models.BooleanField(default=False)
     input_tokens = models.PositiveBigIntegerField("tokens de entrada", default=0)
@@ -107,6 +132,14 @@ class Run(models.Model):
     @property
     def branch(self):
         return f"izzyone/run-{self.pk}"
+
+    @property
+    def compare_url(self):
+        """Página do GitHub que abre um pull request da branch enviada; vazio se não há o que abrir."""
+        repository = github_repository(self.project.repo_url)
+        if not (self.pushed_at and repository):
+            return ""
+        return f"https://github.com/{repository}/compare/{self.project.default_branch}...{self.branch}?expand=1"
 
     @property
     def total_tokens(self):
