@@ -12,6 +12,9 @@ wheels/
 # Environment variables
 .env
 
+# Banco local de desenvolvimento
+*.sqlite3
+
 # Static compilado
 static/css/output.css
 staticfiles/

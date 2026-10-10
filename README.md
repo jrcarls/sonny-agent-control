@@ -1,12 +1,24 @@
-# Sonny Agentes Control
+# Sonny Agent Control
 
-Orquestrador de agentes de IA que trabalham em repositórios de código. Você descreve uma tarefa, escolhe o
-projeto e o agente, e acompanha a execução pela interface web. Os agentes podem ler e alterar o código em um
-worktree git isolado, delegar partes do trabalho entre si e abrir pull requests; as ações sensíveis esperam
-a aprovação de uma pessoa.
+[![Licença MIT](https://img.shields.io/badge/licença-MIT-green.svg)](LICENSE)
+
+Orquestrador de agentes de IA para trabalhar com segurança em repositórios de código.
+
+Você descreve uma tarefa, escolhe o projeto e o agente, e acompanha a execução pela interface web. Os agentes
+podem ler e alterar o código em um worktree Git isolado, delegar partes do trabalho entre si e abrir pull
+requests; as ações sensíveis esperam a aprovação de uma pessoa.
 
 Feito com Django, Celery e LangGraph. Cada agente usa o provedor e o modelo do próprio cadastro
 (Anthropic, OpenAI, Google ou Ollama).
+
+## Recursos
+
+- Projetos com repositório Git, branch padrão e chave SSH própria.
+- Agentes configuráveis por provedor, modelo, prompt, ferramentas e permissões de delegação.
+- Execuções assíncronas com histórico de eventos, delegação e consumo de tokens.
+- Worktree isolado para cada execução, com branches `sonny/run-<id>`.
+- Aprovação humana para comandos no shell e abertura de pull requests.
+- Continuação de execuções interrompidas, cancelamento e detecção de workers inativos.
 
 ## Requisitos
 
@@ -136,3 +148,7 @@ static/                              CSS de entrada e JavaScript de terceiros
 docker compose exec web python manage.py test                          # ou: uv run python manage.py test
 docker compose exec web python manage.py cleanup_workspaces --days 7   # apaga worktrees de execuções antigas
 ```
+
+## Licença
+
+Distribuído sob a [licença MIT](LICENSE).
