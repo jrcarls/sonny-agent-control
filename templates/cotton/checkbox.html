@@ -1,0 +1,3 @@
+{# Caixa de seleção. checked: qualquer valor não vazio marca a caixa. #}
+<c-vars checked="" class="" />
+<input type="checkbox" {{ attrs }}{% if checked %} checked{% endif %} class="h-4 w-4 rounded-xs border border-default-medium bg-neutral-secondary-medium focus:ring-2 focus:ring-brand-soft {{ class }}">

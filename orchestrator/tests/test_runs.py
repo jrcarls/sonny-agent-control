@@ -117,6 +117,20 @@ class RunViewTests(RunTestCase):
         self.assertEqual(listed(situacao="ativas"), {"tarefa ativa", "tarefa esperando"})
         self.assertEqual(listed(situacao="finalizadas"), {"tarefa pronta"})
 
+    def test_list_is_paginated_and_keeps_the_filter(self):
+        Run.objects.bulk_create(
+            Run(project=self.project, agent=self.agent, prompt=f"tarefa {number}", created_by=self.user)
+            for number in range(30)
+        )
+        page = self.client.get(reverse("orchestrator:run_list"), {"situacao": "ativas"})
+        self.assertEqual(len(page.context["runs"]), 25)
+        self.assertContains(page, "Página 1 de 2")
+        self.assertContains(page, 'href="?situacao=ativas&page=2"')
+        self.assertNotContains(page, "Anterior")
+        second = self.client.get(reverse("orchestrator:run_list"), {"situacao": "ativas", "page": 2})
+        self.assertEqual(len(second.context["runs"]), 5)
+        self.assertContains(second, 'href="?situacao=ativas&page=1"')
+
     def test_detail_polls_only_while_working(self):
         run = self.make_run()
         self.assertContains(self.client.get(run.get_absolute_url()), 'hx-trigger="every 2s"')

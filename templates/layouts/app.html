@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 {% block body %}
-    {% include "partials/sidebar.html" %}
+    {% include "layouts/sidebar.html" %}
     <main class="px-4 py-4 transition-[margin] sm:ml-64 sm:px-6 lg:px-8 sm:sidebar-collapsed:ml-16">
         {% for message in messages %}
             <div class="mb-4 rounded-base p-4 text-sm {% if message.level_tag == "error" %}bg-danger-soft text-fg-danger-strong{% else %}bg-success-soft text-fg-success-strong{% endif %}" role="alert">{{ message }}</div>

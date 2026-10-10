@@ -26,7 +26,7 @@ def enqueue(run, event):
 class SidebarView(LoginRequiredMixin, TemplateView):
     """Só o menu lateral, para o htmx atualizar contadores e execuções recentes sem recarregar a página."""
 
-    template_name = "partials/sidebar_nav.html"
+    template_name = "layouts/sidebar_nav.html"
 
 
 class ProtectedDeleteMixin:
@@ -100,7 +100,7 @@ class ProjectUpdateView(LoginRequiredMixin, SuccessMessageMixin, UpdateView):
 
 class ProjectDeleteView(LoginRequiredMixin, ProtectedDeleteMixin, SuccessMessageMixin, DeleteView):
     model = Project
-    template_name = "orchestrator/confirm_delete.html"
+    template_name = "layouts/confirm_delete.html"
     success_url = reverse_lazy("orchestrator:project_list")
     success_message = "Projeto excluído."
     extra_context = {"cancel_url": success_url}
@@ -154,7 +154,7 @@ class AgentUpdateView(LoginRequiredMixin, AgentFormMixin, SuccessMessageMixin, U
 
 class AgentDeleteView(LoginRequiredMixin, ProtectedDeleteMixin, SuccessMessageMixin, DeleteView):
     model = Agent
-    template_name = "orchestrator/confirm_delete.html"
+    template_name = "layouts/confirm_delete.html"
     success_url = reverse_lazy("orchestrator:agent_list")
     success_message = "Agente excluído."
     extra_context = {"cancel_url": success_url}

@@ -1,9 +1,10 @@
-{# Campos de um form Django no estilo Flowbite. Uso: {% include "partials/form_fields.html" with form=form %} #}
+{# Todos os campos de um form Django, um embaixo do outro. Uso: <c-fields :form="form" /> #}
+<c-vars form />
 {% if form.non_field_errors %}
     <div class="mb-4 rounded-base bg-danger-soft p-4 text-sm text-fg-danger-strong" role="alert">
         {{ form.non_field_errors }}
     </div>
 {% endif %}
 {% for field in form %}
-    {% include "partials/form_field.html" %}
+    <c-field :field="field" />
 {% endfor %}

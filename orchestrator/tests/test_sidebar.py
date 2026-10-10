@@ -57,7 +57,7 @@ class SidebarTests(RunTestCase):
         response = self.client.get(
             reverse("orchestrator:sidebar"), headers={"HX-Request": "true", "HX-Current-URL": current}
         )
-        self.assertTemplateUsed(response, "partials/sidebar_nav.html")
+        self.assertTemplateUsed(response, "layouts/sidebar_nav.html")
         self.assertTemplateNotUsed(response, "layouts/app.html")
         self.assertEqual(response.context["sidebar"]["section"], "runs")
         self.assertContains(response, 'aria-current="page"', count=2)  # o item Execuções e a execução na lista

@@ -7,10 +7,10 @@
 <div class="py-6">
     <div class="mb-6 flex items-center justify-between">
         <h1 class="text-2xl font-semibold tracking-tight text-heading">Agentes</h1>
-        <a href="{% url 'orchestrator:agent_create' %}" class="box-border inline-flex items-center justify-center rounded-base border px-4 py-2.5 text-center text-sm font-medium leading-5 shadow-xs focus:outline-none focus:ring-4 border-transparent bg-brand text-white hover:bg-brand-strong focus:ring-brand-medium">
+        <c-button href="{% url 'orchestrator:agent_create' %}">
             {% tabler_icon "plus" "me-1.5 h-4 w-4" %}
             Novo agente
-        </a>
+        </c-button>
     </div>
     {% if agents %}
         <div class="overflow-x-auto rounded-base border border-default bg-neutral-primary-soft shadow-xs">
@@ -45,13 +45,7 @@
             </table>
         </div>
     {% else %}
-        <div class="rounded-base border border-dashed border-default-medium p-8 text-center">
-            <span class="mx-auto mb-3 inline-flex h-10 w-10 items-center justify-center rounded-full bg-neutral-tertiary text-body">
-                {% tabler_icon "robot" "h-6 w-6" %}
-            </span>
-            <p class="text-sm font-medium text-heading">Nenhum agente ainda</p>
-            <p class="mt-1 text-sm text-body">Crie um agente definindo o modelo e as instruções dele.</p>
-        </div>
+        <c-empty-state icon="robot" title="Nenhum agente ainda">Crie um agente definindo o modelo e as instruções dele.</c-empty-state>
     {% endif %}
 </div>
 {% endblock %}

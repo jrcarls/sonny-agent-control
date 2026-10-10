@@ -1,0 +1,10 @@
+{# Aviso de lista vazia: ícone, título e, no conteúdo, uma frase de orientação. #}
+<c-vars icon title />
+{% load tabler_icons %}
+<div class="rounded-base border border-dashed border-default-medium p-8 text-center">
+    <span class="mx-auto mb-3 inline-flex h-10 w-10 items-center justify-center rounded-full bg-neutral-tertiary text-body">
+        {% tabler_icon icon "h-6 w-6" %}
+    </span>
+    <p class="text-sm font-medium text-heading">{{ title }}</p>
+    <p class="mt-1 text-sm text-body">{{ slot }}</p>
+</div>

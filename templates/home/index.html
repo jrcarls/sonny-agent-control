@@ -95,13 +95,7 @@
     {% if recent_runs %}
         {% include "runs/_table.html" with runs=recent_runs %}
     {% else %}
-    <div class="rounded-base border border-dashed border-default-medium p-8 text-center">
-        <span class="mx-auto mb-3 inline-flex h-10 w-10 items-center justify-center rounded-full bg-neutral-tertiary text-body">
-            {% tabler_icon "history" "h-6 w-6" %}
-        </span>
-        <p class="text-sm font-medium text-heading">Nenhuma execução ainda</p>
-        <p class="mt-1 text-sm text-body">As tarefas enviadas aos agentes aparecem aqui.</p>
-    </div>
+    <c-empty-state icon="history" title="Nenhuma execução ainda">As tarefas enviadas aos agentes aparecem aqui.</c-empty-state>
     {% endif %}
 </div>
 {% endblock %}

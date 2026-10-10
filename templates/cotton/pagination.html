@@ -1,0 +1,9 @@
+{# Paginação de uma ListView. query: parâmetros da URL a manter ao trocar de página (ex.: "situacao=ativas"). #}
+<c-vars page_obj query="" />
+<div class="mt-4 flex items-center justify-between text-sm text-body">
+    <span>Página {{ page_obj.number }} de {{ page_obj.paginator.num_pages }}</span>
+    <span class="flex gap-4">
+        {% if page_obj.has_previous %}<a href="?{{ query }}&page={{ page_obj.previous_page_number }}" class="font-medium text-fg-brand hover:underline">Anterior</a>{% endif %}
+        {% if page_obj.has_next %}<a href="?{{ query }}&page={{ page_obj.next_page_number }}" class="font-medium text-fg-brand hover:underline">Próxima</a>{% endif %}
+    </span>
+</div>

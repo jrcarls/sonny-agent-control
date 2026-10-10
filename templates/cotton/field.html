@@ -1,0 +1,44 @@
+{# Um campo de form Django completo: rótulo, controle, erros e texto de ajuda. Uso: <c-field :field="form.name" /> #}
+<c-vars field />
+{% if field.widget_type == "checkbox" %}
+    <div class="mb-4">
+        <div class="flex items-center">
+            <c-checkbox name="{{ field.html_name }}" id="{{ field.id_for_label }}" checked="{% if field.value %}1{% endif %}" />
+            <label for="{{ field.id_for_label }}" class="ms-2 select-none text-sm font-medium text-heading">{{ field.label|capfirst }}</label>
+        </div>
+        {% if field.help_text %}<p class="mt-2 text-sm text-body">{{ field.help_text }}</p>{% endif %}
+    </div>
+{% elif field.widget_type == "checkboxselectmultiple" %}
+    <fieldset class="mb-4">
+        <legend class="mb-2.5 block text-sm font-medium text-heading">{{ field.label|capfirst }}</legend>
+        {% for option in field %}
+            <div class="mb-2 flex items-start">
+                <c-checkbox name="{{ field.html_name }}" value="{{ option.data.value }}" id="{{ option.id_for_label }}" checked="{% if option.data.selected %}1{% endif %}" class="mt-0.5" />
+                <label for="{{ option.id_for_label }}" class="ms-2 select-none text-sm text-heading">{{ option.choice_label }}</label>
+            </div>
+        {% endfor %}
+        {% for error in field.errors %}
+            <p class="mt-2 text-sm text-fg-danger-strong">{{ error }}</p>
+        {% endfor %}
+        {% if field.help_text %}<p class="mt-2 text-sm text-body">{{ field.help_text }}</p>{% endif %}
+    </fieldset>
+{% else %}
+    <div class="mb-4">
+        <label for="{{ field.id_for_label }}" class="mb-2.5 block text-sm font-medium text-heading">{{ field.label|capfirst }}</label>
+        {% if field.widget_type == "select" %}
+            <c-input as="select" name="{{ field.html_name }}" id="{{ field.id_for_label }}" :errors="field.errors" required="{% if field.field.required %}1{% endif %}">
+                {% for value, label in field.field.choices %}
+                    <option value="{{ value }}" {% if field.value|stringformat:'s' == value|stringformat:'s' %}selected{% endif %}>{{ label }}</option>
+                {% endfor %}
+            </c-input>
+        {% elif field.widget_type == "textarea" %}
+            <c-input as="textarea" name="{{ field.html_name }}" id="{{ field.id_for_label }}" rows="{{ field.field.widget.attrs.rows|default:4 }}" :errors="field.errors" required="{% if field.field.required %}1{% endif %}" placeholder="{{ field.field.widget.attrs.placeholder }}">{{ field.value|default_if_none:'' }}</c-input>
+        {% else %}
+            <c-input type="text" name="{{ field.html_name }}" id="{{ field.id_for_label }}" value="{{ field.value|default_if_none:'' }}" :errors="field.errors" required="{% if field.field.required %}1{% endif %}" placeholder="{{ field.field.widget.attrs.placeholder }}" maxlength="{{ field.field.max_length|default_if_none:'' }}" />
+        {% endif %}
+        {% for error in field.errors %}
+            <p class="mt-2 text-sm text-fg-danger-strong">{{ error }}</p>
+        {% endfor %}
+        {% if field.help_text %}<p class="mt-2 text-sm text-body">{{ field.help_text }}</p>{% endif %}
+    </div>
+{% endif %}

@@ -14,10 +14,10 @@
      x-init="if (open) show()" @keydown.escape.window="if (open) close()">
     <div class="mb-6 flex items-center justify-between">
         <h1 class="text-2xl font-semibold tracking-tight text-heading">Projetos</h1>
-        <a href="{% url 'orchestrator:project_create' %}" x-ref="trigger" @click.prevent="show()" class="box-border inline-flex items-center justify-center rounded-base border px-4 py-2.5 text-center text-sm font-medium leading-5 shadow-xs focus:outline-none focus:ring-4 border-transparent bg-brand text-white hover:bg-brand-strong focus:ring-brand-medium">
+        <c-button href="{% url 'orchestrator:project_create' %}" x-ref="trigger" @click.prevent="show()">
             {% tabler_icon "plus" "me-1.5 h-4 w-4" %}
             Novo projeto
-        </a>
+        </c-button>
     </div>
     {% if projects %}
         <div class="overflow-x-auto rounded-base border border-default bg-neutral-primary-soft shadow-xs">
@@ -43,13 +43,7 @@
             </table>
         </div>
     {% else %}
-        <div class="rounded-base border border-dashed border-default-medium p-8 text-center">
-            <span class="mx-auto mb-3 inline-flex h-10 w-10 items-center justify-center rounded-full bg-neutral-tertiary text-body">
-                {% tabler_icon "folders" "h-6 w-6" %}
-            </span>
-            <p class="text-sm font-medium text-heading">Nenhum projeto ainda</p>
-            <p class="mt-1 text-sm text-body">Adicione o repositório em que os agentes vão trabalhar.</p>
-        </div>
+        <c-empty-state icon="folders" title="Nenhum projeto ainda">Adicione o repositório em que os agentes vão trabalhar.</c-empty-state>
     {% endif %}
     <div x-cloak x-show="open" class="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-gray-900/50 p-4 sm:items-center"
          @click.self="close()">

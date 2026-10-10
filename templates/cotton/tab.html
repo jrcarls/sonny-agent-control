@@ -1,0 +1,3 @@
+{# Uma aba de <c-tabs>. active: qualquer texto não vazio marca a aba como a atual. #}
+<c-vars href active="" />
+<a href="{{ href }}" {% if active %}aria-current="page"{% endif %} class="rounded-base px-3 py-1.5 text-sm font-medium {% if active %}bg-brand-softer text-fg-brand-strong{% else %}text-body hover:bg-neutral-tertiary hover:text-heading{% endif %}">{{ slot }}</a>

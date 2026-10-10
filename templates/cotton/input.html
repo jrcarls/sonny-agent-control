@@ -1,0 +1,7 @@
+{% comment %}
+Campo de texto no estilo do sistema. as: input (padrão) | select | textarea; nos dois últimos o conteúdo
+vai dentro da tag. errors: qualquer valor não vazio pinta o campo de erro. required, placeholder e maxlength
+só saem quando preenchidos.
+{% endcomment %}
+<c-vars as="input" errors="" required="" placeholder="" maxlength="" class="" />
+{% if as == "select" %}<select{% elif as == "textarea" %}<textarea{% else %}<input{% endif %} {{ attrs }}{% if required %} required{% endif %}{% if placeholder %} placeholder="{{ placeholder }}"{% endif %}{% if maxlength %} maxlength="{{ maxlength }}"{% endif %} class="block w-full rounded-base border px-3 py-2.5 text-sm shadow-xs {% if errors %}border-danger-subtle bg-danger-soft text-fg-danger-strong placeholder:text-fg-danger-strong focus:border-danger focus:ring-danger{% else %}border-default-medium bg-neutral-secondary-medium text-heading placeholder:text-body focus:border-brand focus:ring-brand{% endif %} {{ class }}">{% if as == "select" %}{{ slot }}</select>{% elif as == "textarea" %}{{ slot }}</textarea>{% endif %}
