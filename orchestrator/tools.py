@@ -18,18 +18,24 @@ COMMAND_TIMEOUT = 300
 class ToolSpec:
     label: str
     description: str
+    group: str
     requires_approval: bool = False
 
 
 # Catálogo exibido no cadastro do agente; a implementação de cada uma fica em build_tools
 TOOL_SPECS = {
-    "list_files": ToolSpec("Listar arquivos", "Vê o conteúdo de pastas do repositório."),
-    "read_file": ToolSpec("Ler arquivo", "Lê arquivos do repositório."),
-    "search_files": ToolSpec("Buscar no código", "Procura um texto ou expressão regular nos arquivos."),
-    "write_file": ToolSpec("Escrever arquivo", "Cria ou sobrescreve arquivos no worktree da execução."),
-    "run_command": ToolSpec("Rodar comando", "Executa comandos de shell no worktree.", requires_approval=True),
+    "list_files": ToolSpec("Listar arquivos", "Vê o conteúdo de pastas do repositório.", "Leitura"),
+    "read_file": ToolSpec("Ler arquivo", "Lê arquivos do repositório.", "Leitura"),
+    "search_files": ToolSpec("Buscar no código", "Procura um texto ou expressão regular nos arquivos.", "Leitura"),
+    "write_file": ToolSpec("Escrever arquivo", "Cria ou sobrescreve arquivos no worktree da execução.", "Escrita"),
+    "run_command": ToolSpec(
+        "Rodar comando", "Executa comandos de shell no worktree.", "Ações sensíveis", requires_approval=True
+    ),
     "open_pull_request": ToolSpec(
-        "Abrir pull request", "Faz commit, envia a branch e abre um PR no GitHub.", requires_approval=True
+        "Abrir pull request",
+        "Faz commit, envia a branch e abre um PR no GitHub.",
+        "Ações sensíveis",
+        requires_approval=True,
     ),
 }
 

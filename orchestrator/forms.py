@@ -19,10 +19,7 @@ class AgentForm(forms.ModelForm):
         label="Ferramentas",
         required=False,
         widget=forms.CheckboxSelectMultiple,
-        choices=[
-            (name, f"{spec.label}: {spec.description}" + (" Pede aprovação a cada uso." if spec.requires_approval else ""))
-            for name, spec in TOOL_SPECS.items()
-        ],
+        choices=[(name, spec.label) for name, spec in TOOL_SPECS.items()],
         initial=DEFAULT_TOOLS,
         help_text="Sem ferramentas, o agente só responde em texto.",
     )
@@ -39,7 +36,16 @@ class AgentForm(forms.ModelForm):
         fields = ["name", "description", "provider", "model", "system_prompt", "tools", "delegates", "is_active"]
         widgets = {
             "description": forms.TextInput(attrs={"placeholder": "Ex.: revisa pull requests"}),
-            "system_prompt": forms.Textarea(attrs={"rows": 8}),
+            "model": forms.TextInput(attrs={"placeholder": "Escolha uma sugestão ou digite o identificador"}),
+            "system_prompt": forms.Textarea(
+                attrs={
+                    "rows": 12,
+                    "placeholder": (
+                        "Ex.: Você revisa pull requests deste projeto. Aponte bugs e riscos antes de estilo, "
+                        "cite o arquivo e a linha, e seja direto."
+                    ),
+                }
+            ),
         }
         help_texts = {
             "description": "Os outros agentes leem isto para decidir o que delegar a ele.",
@@ -53,6 +59,17 @@ class AgentForm(forms.ModelForm):
         self.fields["delegates"].queryset = Agent.objects.exclude(pk=self.instance.pk)
         if not self.fields["delegates"].queryset.exists():
             del self.fields["delegates"]
+        # Agente novo nasce ativo; desativar só faz sentido para um que já existe
+        if self.instance.pk is None:
+            del self.fields["is_active"]
+
+    def tool_groups(self):
+        """[(grupo, [(opção do campo, ToolSpec), ...]), ...] para a tela desenhar as ferramentas por grupo."""
+        options = {option.data["value"]: option for option in self["tools"]}
+        groups = {}
+        for name, spec in TOOL_SPECS.items():
+            groups.setdefault(spec.group, []).append((options[name], spec))
+        return list(groups.items())
 
 
 class RunForm(forms.ModelForm):

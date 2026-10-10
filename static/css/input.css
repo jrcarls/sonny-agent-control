@@ -7,6 +7,11 @@
 /* sidebar recolhida: classe no <html>, alternada pelo botao do cabecalho */
 @custom-variant sidebar-collapsed (&:is(.sidebar-collapsed *));
 
+/* Esconde, até o Alpine carregar, o que ele vai mostrar só em certos casos */
+[x-cloak] {
+    display: none !important;
+}
+
 @theme {
     --font-display: "Orbitron", ui-sans-serif, system-ui, sans-serif;
 

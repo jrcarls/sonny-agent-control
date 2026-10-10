@@ -3,7 +3,7 @@ from django.contrib.auth.mixins import LoginRequiredMixin
 from django.contrib.messages.views import SuccessMessageMixin
 from django.db import transaction
 from django.db.models import ProtectedError
-from django.shortcuts import get_object_or_404, redirect
+from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse_lazy
 from django.utils import timezone
 from django.views import View
@@ -11,6 +11,7 @@ from django.views.generic import CreateView, DeleteView, DetailView, ListView, T
 
 from .forms import AgentForm, ProjectForm, RunForm
 from .models import Agent, Approval, Project, Run, RunEvent
+from .providers import MODEL_SUGGESTIONS, check_model, missing_api_keys
 from .tasks import execute_run
 from .workspace import workspace_path
 
@@ -93,7 +94,31 @@ class AgentListView(LoginRequiredMixin, ListView):
     context_object_name = "agents"
 
 
-class AgentCreateView(LoginRequiredMixin, SuccessMessageMixin, CreateView):
+class AgentFormMixin:
+    """Dados de apoio da tela do agente: sugestões de modelo e provedores sem chave configurada."""
+
+    def get_context_data(self, **kwargs):
+        suggestions = {provider.value: models for provider, models in MODEL_SUGGESTIONS.items()}
+        return super().get_context_data(**kwargs, model_suggestions=suggestions, missing_keys=missing_api_keys())
+
+
+class AgentTestView(LoginRequiredMixin, View):
+    """Testa o provedor e o modelo preenchidos no formulário, sem salvar nada."""
+
+    def post(self, request):
+        provider, model = request.POST.get("provider", ""), request.POST.get("model", "").strip()
+        context = {"model": model}
+        if provider not in Agent.Provider.values or not model:
+            context["error"] = "Escolha o provedor e informe o modelo antes de testar."
+        else:
+            try:
+                context["answer"], context["seconds"] = check_model(provider, model)
+            except Exception as exc:  # qualquer falha do provedor é o próprio resultado do teste
+                context["error"] = f"{type(exc).__name__}: {exc}"[:600]
+        return render(request, "agents/_test_result.html", context)
+
+
+class AgentCreateView(LoginRequiredMixin, AgentFormMixin, SuccessMessageMixin, CreateView):
     model = Agent
     form_class = AgentForm
     template_name = "agents/form.html"
@@ -101,7 +126,7 @@ class AgentCreateView(LoginRequiredMixin, SuccessMessageMixin, CreateView):
     success_message = "Agente “%(name)s” criado."
 
 
-class AgentUpdateView(LoginRequiredMixin, SuccessMessageMixin, UpdateView):
+class AgentUpdateView(LoginRequiredMixin, AgentFormMixin, SuccessMessageMixin, UpdateView):
     model = Agent
     form_class = AgentForm
     template_name = "agents/form.html"

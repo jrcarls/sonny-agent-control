@@ -13,16 +13,9 @@ from langchain_core.tools import tool
 from langgraph.graph import END, START, StateGraph
 from langgraph.types import interrupt
 
-from .models import Agent, RunEvent
+from .models import RunEvent
+from .providers import MODEL_PROVIDERS
 from .tools import TOOL_SPECS, build_tools
-
-# Nome do provedor no cadastro do agente -> nome esperado pelo init_chat_model
-MODEL_PROVIDERS = {
-    Agent.Provider.ANTHROPIC: "anthropic",
-    Agent.Provider.OPENAI: "openai",
-    Agent.Provider.GOOGLE: "google_genai",
-    Agent.Provider.OLLAMA: "ollama",
-}
 
 DELEGATE_TOOL = "delegate_task"
 # Entrada do log que não vira evento: consumo de tokens de uma chamada ao modelo
