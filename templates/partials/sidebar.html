@@ -12,7 +12,16 @@
   } catch (e) {}
 </script>
 
-<aside id="default-sidebar" class="fixed top-0 left-0 z-40 w-64 h-screen transition-[width,translate] -translate-x-full sm:translate-x-0 sm:sidebar-collapsed:w-16" aria-label="Sidenav">
+<aside id="default-sidebar" class="fixed top-0 left-0 z-40 w-64 h-screen transition-[width,translate] -translate-x-full sm:translate-x-0 sm:sidebar-collapsed:w-16" aria-label="Sidenav"
+       x-data="{
+         collapsed: document.documentElement.classList.contains('sidebar-collapsed'),
+         get rail() { return this.collapsed && window.matchMedia('(min-width: 640px)').matches },
+         setCollapsed(value) {
+           this.collapsed = value;
+           document.documentElement.classList.toggle('sidebar-collapsed', value);
+           try { localStorage.setItem('sidebar-collapsed', value ? '1' : '0') } catch (e) {}
+         }
+       }">
   <div class="overflow-y-auto pt-5 pb-20 px-3 h-full bg-white border-r border-gray-200 dark:bg-gray-800 dark:border-gray-700">
       <div class="flex items-center justify-between pb-5 mb-4 border-b border-gray-200 dark:border-gray-700 sm:sidebar-collapsed:justify-center">
         <a href="{% url 'home' %}" class="flex flex-col px-2 min-w-0 sm:sidebar-collapsed:hidden">
@@ -20,8 +29,7 @@
           <span class="font-display mt-2 text-[0.5625rem] font-medium leading-none tracking-[0.25em] uppercase text-gray-500 dark:text-gray-400">Agentes Control</span>
         </a>
         <button type="button"
-                x-data="{ collapsed: document.documentElement.classList.contains('sidebar-collapsed') }"
-                @click="collapsed = !collapsed; document.documentElement.classList.toggle('sidebar-collapsed', collapsed); try { localStorage.setItem('sidebar-collapsed', collapsed ? '1' : '0') } catch (e) {}"
+                @click="setCollapsed(!collapsed)"
                 :aria-expanded="(!collapsed).toString()" aria-controls="default-sidebar"
                 :title="collapsed ? 'Expandir menu' : 'Recolher menu'"
                 class="hidden sm:inline-flex shrink-0 items-center justify-center p-1.5 text-gray-400 rounded-lg cursor-pointer hover:text-gray-900 hover:bg-gray-100 dark:hover:text-white dark:hover:bg-gray-700">
@@ -37,29 +45,65 @@
                   <span class="ml-3 sm:sidebar-collapsed:hidden">Visão geral</span>
               </a>
           </li>
-          <li>
-              <a href="#" title="Projetos" class="flex items-center p-2 text-base font-normal text-gray-900 rounded-lg dark:text-white hover:bg-gray-100 dark:hover:bg-gray-700 group">
+          <li x-data="{ open: false }">
+              <button type="button" title="Projetos" @click="rail ? (setCollapsed(false), open = true) : open = !open" :aria-expanded="open.toString()" aria-controls="dropdown-projetos" class="flex items-center p-2 w-full text-base font-normal text-gray-900 rounded-lg cursor-pointer dark:text-white hover:bg-gray-100 dark:hover:bg-gray-700 group">
                   {% tabler_icon "folders" "shrink-0 w-6 h-6 text-gray-400 transition duration-75 dark:text-gray-400 group-hover:text-gray-900 dark:group-hover:text-white" %}
-                  <span class="ml-3 sm:sidebar-collapsed:hidden">Projetos</span>
-              </a>
+                  <span class="flex-1 ml-3 text-left whitespace-nowrap sm:sidebar-collapsed:hidden">Projetos</span>
+                  <span class="transition-transform sm:sidebar-collapsed:hidden" :class="open && 'rotate-180'">{% tabler_icon "chevron-down" "w-5 h-5 text-gray-400" %}</span>
+              </button>
+              <ul id="dropdown-projetos" class="hidden py-2 space-y-2 sm:sidebar-collapsed:hidden" :class="{ 'hidden': !open }">
+                  <li>
+                      <a href="#" class="flex items-center p-2 pl-11 w-full text-base font-normal text-gray-900 rounded-lg transition duration-75 hover:bg-gray-100 dark:text-white dark:hover:bg-gray-700">Todos os projetos</a>
+                  </li>
+                  <li>
+                      <a href="#" class="flex items-center p-2 pl-11 w-full text-base font-normal text-gray-900 rounded-lg transition duration-75 hover:bg-gray-100 dark:text-white dark:hover:bg-gray-700">Novo projeto</a>
+                  </li>
+              </ul>
           </li>
-          <li>
-              <a href="#" title="Agentes" class="flex items-center p-2 text-base font-normal text-gray-900 rounded-lg dark:text-white hover:bg-gray-100 dark:hover:bg-gray-700 group">
+          <li x-data="{ open: false }">
+              <button type="button" title="Agentes" @click="rail ? (setCollapsed(false), open = true) : open = !open" :aria-expanded="open.toString()" aria-controls="dropdown-agentes" class="flex items-center p-2 w-full text-base font-normal text-gray-900 rounded-lg cursor-pointer dark:text-white hover:bg-gray-100 dark:hover:bg-gray-700 group">
                   {% tabler_icon "robot" "shrink-0 w-6 h-6 text-gray-400 transition duration-75 dark:text-gray-400 group-hover:text-gray-900 dark:group-hover:text-white" %}
-                  <span class="ml-3 sm:sidebar-collapsed:hidden">Agentes</span>
-              </a>
+                  <span class="flex-1 ml-3 text-left whitespace-nowrap sm:sidebar-collapsed:hidden">Agentes</span>
+                  <span class="transition-transform sm:sidebar-collapsed:hidden" :class="open && 'rotate-180'">{% tabler_icon "chevron-down" "w-5 h-5 text-gray-400" %}</span>
+              </button>
+              <ul id="dropdown-agentes" class="hidden py-2 space-y-2 sm:sidebar-collapsed:hidden" :class="{ 'hidden': !open }">
+                  <li>
+                      <a href="#" class="flex items-center p-2 pl-11 w-full text-base font-normal text-gray-900 rounded-lg transition duration-75 hover:bg-gray-100 dark:text-white dark:hover:bg-gray-700">Todos os agentes</a>
+                  </li>
+                  <li>
+                      <a href="#" class="flex items-center p-2 pl-11 w-full text-base font-normal text-gray-900 rounded-lg transition duration-75 hover:bg-gray-100 dark:text-white dark:hover:bg-gray-700">Novo agente</a>
+                  </li>
+              </ul>
           </li>
-          <li>
-              <a href="#" title="Execuções" class="flex items-center p-2 text-base font-normal text-gray-900 rounded-lg dark:text-white hover:bg-gray-100 dark:hover:bg-gray-700 group">
+          <li x-data="{ open: false }">
+              <button type="button" title="Execuções" @click="rail ? (setCollapsed(false), open = true) : open = !open" :aria-expanded="open.toString()" aria-controls="dropdown-execucoes" class="flex items-center p-2 w-full text-base font-normal text-gray-900 rounded-lg cursor-pointer dark:text-white hover:bg-gray-100 dark:hover:bg-gray-700 group">
                   {% tabler_icon "player-play" "shrink-0 w-6 h-6 text-gray-400 transition duration-75 dark:text-gray-400 group-hover:text-gray-900 dark:group-hover:text-white" %}
-                  <span class="ml-3 sm:sidebar-collapsed:hidden">Execuções</span>
-              </a>
+                  <span class="flex-1 ml-3 text-left whitespace-nowrap sm:sidebar-collapsed:hidden">Execuções</span>
+                  <span class="transition-transform sm:sidebar-collapsed:hidden" :class="open && 'rotate-180'">{% tabler_icon "chevron-down" "w-5 h-5 text-gray-400" %}</span>
+              </button>
+              <ul id="dropdown-execucoes" class="hidden py-2 space-y-2 sm:sidebar-collapsed:hidden" :class="{ 'hidden': !open }">
+                  <li>
+                      <a href="#" class="flex items-center p-2 pl-11 w-full text-base font-normal text-gray-900 rounded-lg transition duration-75 hover:bg-gray-100 dark:text-white dark:hover:bg-gray-700">Em andamento</a>
+                  </li>
+                  <li>
+                      <a href="#" class="flex items-center p-2 pl-11 w-full text-base font-normal text-gray-900 rounded-lg transition duration-75 hover:bg-gray-100 dark:text-white dark:hover:bg-gray-700">Concluídas</a>
+                  </li>
+              </ul>
           </li>
-          <li>
-              <a href="#" title="Aprovações" class="flex items-center p-2 text-base font-normal text-gray-900 rounded-lg dark:text-white hover:bg-gray-100 dark:hover:bg-gray-700 group">
+          <li x-data="{ open: false }">
+              <button type="button" title="Aprovações" @click="rail ? (setCollapsed(false), open = true) : open = !open" :aria-expanded="open.toString()" aria-controls="dropdown-aprovacoes" class="flex items-center p-2 w-full text-base font-normal text-gray-900 rounded-lg cursor-pointer dark:text-white hover:bg-gray-100 dark:hover:bg-gray-700 group">
                   {% tabler_icon "checklist" "shrink-0 w-6 h-6 text-gray-400 transition duration-75 dark:text-gray-400 group-hover:text-gray-900 dark:group-hover:text-white" %}
-                  <span class="ml-3 sm:sidebar-collapsed:hidden">Aprovações</span>
-              </a>
+                  <span class="flex-1 ml-3 text-left whitespace-nowrap sm:sidebar-collapsed:hidden">Aprovações</span>
+                  <span class="transition-transform sm:sidebar-collapsed:hidden" :class="open && 'rotate-180'">{% tabler_icon "chevron-down" "w-5 h-5 text-gray-400" %}</span>
+              </button>
+              <ul id="dropdown-aprovacoes" class="hidden py-2 space-y-2 sm:sidebar-collapsed:hidden" :class="{ 'hidden': !open }">
+                  <li>
+                      <a href="#" class="flex items-center p-2 pl-11 w-full text-base font-normal text-gray-900 rounded-lg transition duration-75 hover:bg-gray-100 dark:text-white dark:hover:bg-gray-700">Pendentes</a>
+                  </li>
+                  <li>
+                      <a href="#" class="flex items-center p-2 pl-11 w-full text-base font-normal text-gray-900 rounded-lg transition duration-75 hover:bg-gray-100 dark:text-white dark:hover:bg-gray-700">Histórico</a>
+                  </li>
+              </ul>
           </li>
       </ul>
   </div>
