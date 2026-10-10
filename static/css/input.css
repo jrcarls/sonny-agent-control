@@ -2,3 +2,44 @@
 @import "flowbite/src/themes/default";
 @plugin "flowbite/plugin";
 @source "../../node_modules/flowbite";
+
+@custom-variant dark (&:where(.dark, .dark *));
+
+@theme {
+    --color-primary-50: #f7fee7;
+    --color-primary-100: #ecfccb;
+    --color-primary-200: #d9f99d;
+    --color-primary-300: #bef264;
+    --color-primary-400: #a3e635;
+    --color-primary-500: #84cc16;
+    --color-primary-600: #65a30d;
+    --color-primary-700: #4d7c0f;
+    --color-primary-800: #3f6212;
+    --color-primary-900: #365314;
+    --color-primary-950: #1a2e05;
+
+    /* cor "brand" do Flowbite (botões, links, foco) segue a paleta primary */
+    --color-fg-brand-subtle: var(--color-primary-200);
+    --color-fg-brand: var(--color-primary-700);
+    --color-fg-brand-strong: var(--color-primary-900);
+    --color-brand-softer: var(--color-primary-50);
+    --color-brand-soft: var(--color-primary-100);
+    --color-brand: var(--color-primary-700);
+    --color-brand-medium: var(--color-primary-200);
+    --color-brand-strong: var(--color-primary-800);
+    --color-brand-subtle: var(--color-primary-200);
+    --color-brand-light: var(--color-primary-600);
+}
+
+.dark {
+    --color-fg-brand-subtle: var(--color-primary-200);
+    --color-fg-brand: var(--color-primary-500);
+    --color-fg-brand-strong: var(--color-primary-400);
+    --color-brand-softer: var(--color-primary-950);
+    --color-brand-soft: var(--color-primary-900);
+    --color-brand: var(--color-primary-600);
+    --color-brand-medium: var(--color-primary-900);
+    --color-brand-strong: var(--color-primary-700);
+    --color-brand-subtle: var(--color-primary-900);
+    --color-brand-light: var(--color-primary-600);
+}

@@ -1,9 +1,7 @@
-{% extends "base.html" %}
+{% extends "layouts/app.html" %}
 
 {% block title %}Home{% endblock %}
 
 {% block content %}
-<div class="flex items-center justify-center min-h-screen">
-    <p class="text-xl">Olá, {{ user.username }}!</p>
-</div>
+<p class="text-xl">Olá, {{ user.username }}!</p>
 {% endblock %}
