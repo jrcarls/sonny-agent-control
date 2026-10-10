@@ -4,6 +4,8 @@
 @source "../../node_modules/flowbite";
 
 @custom-variant dark (&:where(.dark, .dark *));
+/* sidebar recolhida: classe no <html>, alternada pelo botao do cabecalho */
+@custom-variant sidebar-collapsed (&:is(.sidebar-collapsed *));
 
 @theme {
     --font-display: "Orbitron", ui-sans-serif, system-ui, sans-serif;
