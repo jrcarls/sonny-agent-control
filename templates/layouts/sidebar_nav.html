@@ -2,7 +2,7 @@
 {# Menu da sidebar. Depende do estado das execuções, por isso o htmx o busca de novo a cada 10s. #}
 <nav id="sidebar-nav" hx-get="{% url 'orchestrator:sidebar' %}" hx-trigger="every 10s" hx-swap="outerHTML">
     <a href="{% url 'home' %}" title="Nova tarefa"
-       class="flex items-center justify-center p-2 mb-4 text-sm font-medium text-white rounded-lg bg-primary-700 hover:bg-primary-800 focus:ring-4 focus:ring-primary-300 focus:outline-none dark:bg-primary-600 dark:hover:bg-primary-700 dark:focus:ring-primary-800">
+       class="flex items-center justify-center px-2 py-2 mb-4 text-sm font-semibold leading-5 text-white rounded-lg bg-primary-700 hover:bg-primary-800 focus:ring-4 focus:ring-primary-300 focus:outline-none dark:bg-primary-600 dark:hover:bg-primary-700 dark:focus:ring-primary-800">
         {% tabler_icon "plus" "shrink-0 w-5 h-5" %}
         <span class="ml-2 sm:sidebar-collapsed:hidden">Nova tarefa</span>
     </a>
@@ -10,9 +10,9 @@
     <ul class="space-y-1">
         <li>
             <a href="{% url 'orchestrator:run_list' %}" title="Execuções" {% if sidebar.section == "runs" %}aria-current="page"{% endif %}
-               class="flex items-center p-2 text-base rounded-lg group {% if sidebar.section == "runs" %}bg-gray-100 font-medium text-gray-900 dark:bg-gray-700 dark:text-white{% else %}font-normal text-gray-900 hover:bg-gray-100 dark:text-white dark:hover:bg-gray-700{% endif %}">
+               class="flex items-center px-2 py-2 text-sm leading-5 rounded-lg group sm:sidebar-collapsed:justify-center {% if sidebar.section == "runs" %}bg-gray-100 font-semibold text-gray-900 dark:bg-gray-700 dark:text-white{% else %}font-medium text-gray-600 hover:bg-gray-100 hover:text-gray-900 dark:text-gray-300 dark:hover:bg-gray-700 dark:hover:text-white{% endif %}">
                 <span class="relative shrink-0">
-                    {% if sidebar.section == "runs" %}{% tabler_icon "player-play" "shrink-0 w-6 h-6 transition duration-75 text-primary-600 dark:text-primary-400" %}{% else %}{% tabler_icon "player-play" "shrink-0 w-6 h-6 transition duration-75 text-gray-400 group-hover:text-gray-900 dark:group-hover:text-white" %}{% endif %}
+                    {% if sidebar.section == "runs" %}{% tabler_icon "player-play" "shrink-0 w-5 h-5 transition duration-75 text-primary-600 dark:text-primary-400" %}{% else %}{% tabler_icon "player-play" "shrink-0 w-5 h-5 transition duration-75 text-gray-400 group-hover:text-gray-900 dark:group-hover:text-white" %}{% endif %}
                     {% if sidebar.running_runs %}<span class="absolute -top-0.5 -right-0.5 hidden h-2 w-2 animate-pulse rounded-full bg-primary-500 sm:sidebar-collapsed:block"></span>{% endif %}
                 </span>
                 <span class="ml-3 sm:sidebar-collapsed:hidden">Execuções</span>
@@ -21,33 +21,33 @@
         </li>
         <li>
             <a href="{% url 'orchestrator:approval_list' %}" title="Aprovações" {% if sidebar.section == "approvals" %}aria-current="page"{% endif %}
-               class="flex items-center p-2 text-base rounded-lg group {% if sidebar.section == "approvals" %}bg-gray-100 font-medium text-gray-900 dark:bg-gray-700 dark:text-white{% else %}font-normal text-gray-900 hover:bg-gray-100 dark:text-white dark:hover:bg-gray-700{% endif %}">
+               class="flex items-center px-2 py-2 text-sm leading-5 rounded-lg group sm:sidebar-collapsed:justify-center {% if sidebar.section == "approvals" %}bg-gray-100 font-semibold text-gray-900 dark:bg-gray-700 dark:text-white{% else %}font-medium text-gray-600 hover:bg-gray-100 hover:text-gray-900 dark:text-gray-300 dark:hover:bg-gray-700 dark:hover:text-white{% endif %}">
                 <span class="relative shrink-0">
-                    {% if sidebar.section == "approvals" %}{% tabler_icon "checklist" "shrink-0 w-6 h-6 transition duration-75 text-primary-600 dark:text-primary-400" %}{% else %}{% tabler_icon "checklist" "shrink-0 w-6 h-6 transition duration-75 text-gray-400 group-hover:text-gray-900 dark:group-hover:text-white" %}{% endif %}
+                    {% if sidebar.section == "approvals" %}{% tabler_icon "checklist" "shrink-0 w-5 h-5 transition duration-75 text-primary-600 dark:text-primary-400" %}{% else %}{% tabler_icon "checklist" "shrink-0 w-5 h-5 transition duration-75 text-gray-400 group-hover:text-gray-900 dark:group-hover:text-white" %}{% endif %}
                     {% if sidebar.pending_approvals %}<span class="absolute -top-0.5 -right-0.5 hidden h-2 w-2 rounded-full bg-amber-500 sm:sidebar-collapsed:block"></span>{% endif %}
                 </span>
                 <span class="ml-3 sm:sidebar-collapsed:hidden">Aprovações</span>
-                {% if sidebar.pending_approvals %}<span class="ms-auto inline-flex min-w-5 items-center justify-center rounded-full bg-amber-100 px-1.5 py-0.5 text-xs font-medium text-amber-800 dark:bg-amber-900 dark:text-amber-200 sm:sidebar-collapsed:hidden">{{ sidebar.pending_approvals }}<span class="sr-only"> pendentes</span></span>{% endif %}
+                {% if sidebar.pending_approvals %}<span class="ms-auto inline-flex min-w-5 items-center justify-center rounded-full bg-amber-100 px-1.5 py-0.5 text-[0.6875rem] font-semibold leading-4 tabular-nums text-amber-800 dark:bg-amber-900 dark:text-amber-200 sm:sidebar-collapsed:hidden">{{ sidebar.pending_approvals }}<span class="sr-only"> pendentes</span></span>{% endif %}
             </a>
         </li>
     </ul>
 
-    <p class="mt-6 px-2 mb-2 text-xs font-medium tracking-wide text-gray-500 uppercase dark:text-gray-400 sm:sidebar-collapsed:hidden">Cadastros</p>
+    <p class="mt-6 px-2 mb-2 text-[0.6875rem] font-semibold leading-4 tracking-widest text-gray-400 uppercase dark:text-gray-500 sm:sidebar-collapsed:hidden">Cadastros</p>
     <ul class="space-y-1 sm:sidebar-collapsed:mt-4 sm:sidebar-collapsed:pt-4 sm:sidebar-collapsed:border-t sm:sidebar-collapsed:border-gray-200 dark:sm:sidebar-collapsed:border-gray-700">
         <li>
             <a href="{% url 'orchestrator:project_list' %}" title="Projetos" {% if sidebar.section == "projects" %}aria-current="page"{% endif %}
-               class="flex items-center p-2 text-base rounded-lg group {% if sidebar.section == "projects" %}bg-gray-100 font-medium text-gray-900 dark:bg-gray-700 dark:text-white{% else %}font-normal text-gray-900 hover:bg-gray-100 dark:text-white dark:hover:bg-gray-700{% endif %}">
+               class="flex items-center px-2 py-2 text-sm leading-5 rounded-lg group sm:sidebar-collapsed:justify-center {% if sidebar.section == "projects" %}bg-gray-100 font-semibold text-gray-900 dark:bg-gray-700 dark:text-white{% else %}font-medium text-gray-600 hover:bg-gray-100 hover:text-gray-900 dark:text-gray-300 dark:hover:bg-gray-700 dark:hover:text-white{% endif %}">
                 <span class="relative shrink-0">
-                    {% if sidebar.section == "projects" %}{% tabler_icon "folders" "shrink-0 w-6 h-6 transition duration-75 text-primary-600 dark:text-primary-400" %}{% else %}{% tabler_icon "folders" "shrink-0 w-6 h-6 transition duration-75 text-gray-400 group-hover:text-gray-900 dark:group-hover:text-white" %}{% endif %}
+                    {% if sidebar.section == "projects" %}{% tabler_icon "folders" "shrink-0 w-5 h-5 transition duration-75 text-primary-600 dark:text-primary-400" %}{% else %}{% tabler_icon "folders" "shrink-0 w-5 h-5 transition duration-75 text-gray-400 group-hover:text-gray-900 dark:group-hover:text-white" %}{% endif %}
                 </span>
                 <span class="ml-3 sm:sidebar-collapsed:hidden">Projetos</span>
             </a>
         </li>
         <li>
             <a href="{% url 'orchestrator:agent_list' %}" title="Agentes" {% if sidebar.section == "agents" %}aria-current="page"{% endif %}
-               class="flex items-center p-2 text-base rounded-lg group {% if sidebar.section == "agents" %}bg-gray-100 font-medium text-gray-900 dark:bg-gray-700 dark:text-white{% else %}font-normal text-gray-900 hover:bg-gray-100 dark:text-white dark:hover:bg-gray-700{% endif %}">
+               class="flex items-center px-2 py-2 text-sm leading-5 rounded-lg group sm:sidebar-collapsed:justify-center {% if sidebar.section == "agents" %}bg-gray-100 font-semibold text-gray-900 dark:bg-gray-700 dark:text-white{% else %}font-medium text-gray-600 hover:bg-gray-100 hover:text-gray-900 dark:text-gray-300 dark:hover:bg-gray-700 dark:hover:text-white{% endif %}">
                 <span class="relative shrink-0">
-                    {% if sidebar.section == "agents" %}{% tabler_icon "robot" "shrink-0 w-6 h-6 transition duration-75 text-primary-600 dark:text-primary-400" %}{% else %}{% tabler_icon "robot" "shrink-0 w-6 h-6 transition duration-75 text-gray-400 group-hover:text-gray-900 dark:group-hover:text-white" %}{% endif %}
+                    {% if sidebar.section == "agents" %}{% tabler_icon "robot" "shrink-0 w-5 h-5 transition duration-75 text-primary-600 dark:text-primary-400" %}{% else %}{% tabler_icon "robot" "shrink-0 w-5 h-5 transition duration-75 text-gray-400 group-hover:text-gray-900 dark:group-hover:text-white" %}{% endif %}
                 </span>
                 <span class="ml-3 sm:sidebar-collapsed:hidden">Agentes</span>
             </a>
@@ -56,12 +56,12 @@
 
     {% if sidebar.recent_runs %}
         <div class="sm:sidebar-collapsed:hidden">
-            <p class="mt-6 px-2 mb-2 text-xs font-medium tracking-wide text-gray-500 uppercase dark:text-gray-400 sm:sidebar-collapsed:hidden">Recentes</p>
+            <p class="mt-6 px-2 mb-2 text-[0.6875rem] font-semibold leading-4 tracking-widest text-gray-400 uppercase dark:text-gray-500 sm:sidebar-collapsed:hidden">Recentes</p>
             <ul class="space-y-0.5">
                 {% for run in sidebar.recent_runs %}
                     <li>
                         <a href="{{ run.get_absolute_url }}" title="{{ run.get_status_display }}: {{ run.prompt|truncatechars:200 }}" {% if run.get_absolute_url == sidebar.path %}aria-current="page"{% endif %}
-                           class="flex items-center px-2 py-1.5 text-sm rounded-lg {% if run.get_absolute_url == sidebar.path %}bg-gray-100 text-gray-900 dark:bg-gray-700 dark:text-white{% else %}text-gray-600 hover:bg-gray-100 hover:text-gray-900 dark:text-gray-300 dark:hover:bg-gray-700 dark:hover:text-white{% endif %}">
+                           class="flex items-center px-2 py-1.5 text-[0.8125rem] leading-5 rounded-lg {% if run.get_absolute_url == sidebar.path %}bg-gray-100 font-medium text-gray-900 dark:bg-gray-700 dark:text-white{% else %}text-gray-500 hover:bg-gray-100 hover:text-gray-900 dark:text-gray-400 dark:hover:bg-gray-700 dark:hover:text-white{% endif %}">
                             <span class="shrink-0 h-2 w-2 rounded-full {% if run.status == "running" %}animate-pulse bg-primary-500{% elif run.status == "waiting_approval" %}bg-amber-500{% elif run.status == "succeeded" %}bg-green-500{% elif run.status == "failed" or run.status == "canceled" %}bg-red-500{% elif run.status == "queued" %}bg-yellow-400{% else %}bg-gray-300 dark:bg-gray-500{% endif %}"></span>
                             <span class="ml-2.5 truncate">{{ run.prompt|truncatechars:60 }}</span>
                         </a>
