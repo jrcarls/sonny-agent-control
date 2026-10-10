@@ -3,7 +3,7 @@
 {% block title %}{{ run }}{% endblock %}
 
 {% block content %}
-<div class="mx-auto max-w-4xl py-6">
+<div class="py-6">
     <a href="{% url 'orchestrator:run_list' %}" class="text-sm font-medium text-fg-brand hover:underline">← Execuções</a>
     <h1 class="mt-2 text-2xl font-semibold tracking-tight text-heading">{{ run }}</h1>
     <p class="mt-1 mb-6 text-sm text-body">{{ run.agent.name }} em {{ run.project.name }}</p>

@@ -13,7 +13,7 @@
         <tbody>
             {% for run in runs %}
                 <tr class="border-b border-default last:border-0">
-                    <th scope="row" class="max-w-xs px-6 py-4 font-medium text-heading">
+                    <th scope="row" class="max-w-xl px-6 py-4 font-medium text-heading">
                         <a href="{{ run.get_absolute_url }}" class="block truncate hover:underline">{{ run.prompt|truncatechars:80 }}</a>
                     </th>
                     <td class="px-6 py-4">{{ run.project.name }}</td>
