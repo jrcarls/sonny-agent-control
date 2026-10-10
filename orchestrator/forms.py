@@ -79,4 +79,8 @@ class RunForm(forms.ModelForm):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        self.fields["project"].empty_label = "Projeto"
+        self.fields["agent"].empty_label = "Agente"
         self.fields["agent"].queryset = Agent.objects.filter(is_active=True)
+        # O modelo ao lado do nome ajuda a escolher entre agentes parecidos
+        self.fields["agent"].label_from_instance = lambda agent: f"{agent.name} · {agent.model}"

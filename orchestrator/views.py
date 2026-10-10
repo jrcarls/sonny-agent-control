@@ -4,7 +4,7 @@ from django.contrib.messages.views import SuccessMessageMixin
 from django.db import transaction
 from django.db.models import ProtectedError
 from django.shortcuts import get_object_or_404, redirect, render
-from django.urls import reverse_lazy
+from django.urls import reverse, reverse_lazy
 from django.utils import timezone
 from django.views import View
 from django_htmx.http import HttpResponseClientRedirect
@@ -45,11 +45,57 @@ class HomeView(LoginRequiredMixin, CreateView):
     form_class = RunForm
     template_name = "home/index.html"
 
+    def get_initial(self):
+        """Já deixa escolhidos o projeto e o agente da última tarefa da pessoa, ou os únicos que existem."""
+        initial = super().get_initial()
+        projects = list(Project.objects.values_list("pk", flat=True)[:2])
+        agents = list(Agent.objects.filter(is_active=True).values_list("pk", flat=True)[:2])
+        last = Run.objects.filter(created_by=self.request.user).select_related("agent").first()
+        if last:
+            initial["project"] = last.project_id
+            if last.agent.is_active:
+                initial["agent"] = last.agent_id
+        if len(projects) == 1:
+            initial["project"] = projects[0]
+        if len(agents) == 1:
+            initial["agent"] = agents[0]
+        return initial
+
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        form = context["form"]
-        context["can_submit"] = form.fields["project"].queryset.exists() and form.fields["agent"].queryset.exists()
+        agents = context["form"].fields["agent"].queryset
+        has_project, has_agent, has_run = Project.objects.exists(), agents.exists(), Run.objects.exists()
+        context["can_submit"] = has_project and has_agent
         context["recent_runs"] = Run.objects.select_related("project", "agent")[:5]
+        # id do agente -> variável de ambiente que falta, para avisar antes de a execução falhar
+        missing = missing_api_keys()
+        context["agents_without_key"] = {
+            str(agent.pk): missing[agent.provider] for agent in agents if agent.provider in missing
+        }
+        if not (has_project and has_agent and has_run):
+            context["onboarding"] = [
+                {
+                    "title": "Adicionar um projeto",
+                    "text": "Informe o repositório git em que os agentes vão trabalhar.",
+                    "icon": "folders",
+                    "url": reverse("orchestrator:project_list") + "?novo=1",
+                    "done": has_project,
+                },
+                {
+                    "title": "Criar um agente",
+                    "text": "Defina o modelo, as instruções e o que ele tem permissão para fazer.",
+                    "icon": "robot",
+                    "url": reverse("orchestrator:agent_create"),
+                    "done": has_agent,
+                },
+                {
+                    "title": "Enviar a primeira tarefa",
+                    "text": "Descreva o que precisa na caixa acima e acompanhe a execução.",
+                    "icon": "player-play",
+                    "url": "#prompt",
+                    "done": has_run,
+                },
+            ]
         return context
 
     def form_valid(self, form):
