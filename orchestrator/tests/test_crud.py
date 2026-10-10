@@ -39,6 +39,39 @@ class ProjectViewTests(TestCase):
         self.assertFalse(Project.objects.exists())
         self.assertContains(response, "Este campo é obrigatório")
 
+    def test_new_project_form_lives_in_a_modal_on_the_list(self):
+        url = reverse("orchestrator:project_list")
+        page = self.client.get(url)
+        self.assertTemplateUsed(page, "projects/_create_form.html")
+        self.assertContains(page, 'role="dialog"')
+        self.assertContains(page, "open: false")
+        self.assertContains(self.client.get(url, {"novo": "1"}), "open: true")
+        # O endereço antigo da página de criação leva para a lista com o modal aberto
+        self.assertRedirects(self.client.get(reverse("orchestrator:project_create")), url + "?novo=1")
+
+    def test_modal_submit_redirects_the_browser_to_the_list(self):
+        response = self.client.post(
+            reverse("orchestrator:project_create"),
+            {"name": "Site", "repo_url": "git@github.com:org/site.git", "default_branch": "main"},
+            headers={"HX-Request": "true"},
+        )
+        self.assertEqual(response["HX-Redirect"], reverse("orchestrator:project_list"))
+        self.assertTrue(Project.objects.filter(name="Site").exists())
+        self.assertContains(self.client.get(reverse("orchestrator:project_list")), "criado")
+
+    def test_modal_errors_come_back_as_just_the_form(self):
+        response = self.client.post(
+            reverse("orchestrator:project_create"),
+            {"name": "Site", "default_branch": "main"},
+            headers={"HX-Request": "true"},
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertTemplateUsed(response, "projects/_create_form.html")
+        self.assertTemplateNotUsed(response, "layouts/app.html")
+        self.assertContains(response, "Este campo é obrigatório")
+        self.assertContains(response, 'value="Site"')
+        self.assertFalse(Project.objects.exists())
+
     def test_update(self):
         project = Project.objects.create(name="Site", repo_url="https://example.com/a.git")
         response = self.client.get(project.get_absolute_url())

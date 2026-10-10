@@ -53,7 +53,7 @@
             {% endfor %}
         {% endfor %}
         {% if not can_submit %}
-            <p class="mt-2.5 text-sm text-body">Para enviar, <a href="{% url 'orchestrator:project_create' %}" class="font-medium text-fg-brand hover:underline">adicione um projeto</a> e <a href="{% url 'orchestrator:agent_create' %}" class="font-medium text-fg-brand hover:underline">crie um agente</a> ativo.</p>
+            <p class="mt-2.5 text-sm text-body">Para enviar, <a href="{% url 'orchestrator:project_list' %}?novo=1" class="font-medium text-fg-brand hover:underline">adicione um projeto</a> e <a href="{% url 'orchestrator:agent_create' %}" class="font-medium text-fg-brand hover:underline">crie um agente</a> ativo.</p>
         {% endif %}
     </form>
 

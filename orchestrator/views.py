@@ -7,6 +7,7 @@ from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse_lazy
 from django.utils import timezone
 from django.views import View
+from django_htmx.http import HttpResponseClientRedirect
 from django.views.generic import CreateView, DeleteView, DetailView, ListView, TemplateView, UpdateView
 
 from .forms import AgentForm, ProjectForm, RunForm
@@ -63,13 +64,30 @@ class ProjectListView(LoginRequiredMixin, ListView):
     template_name = "projects/list.html"
     context_object_name = "projects"
 
+    def get_context_data(self, **kwargs):
+        # O formulário de novo projeto abre em um modal nesta tela; ?novo=1 já chega com ele aberto
+        return super().get_context_data(**kwargs, form=ProjectForm(), open_modal="novo" in self.request.GET)
+
 
 class ProjectCreateView(LoginRequiredMixin, SuccessMessageMixin, CreateView):
+    """Recebe o formulário do modal de novo projeto (via htmx) na lista de projetos."""
+
     model = Project
     form_class = ProjectForm
     template_name = "projects/form.html"
     success_url = reverse_lazy("orchestrator:project_list")
     success_message = "Projeto “%(name)s” criado."
+
+    def get(self, request, *args, **kwargs):
+        return redirect(f"{self.success_url}?novo=1")
+
+    def get_template_names(self):
+        # No modal, erros de validação voltam só com o formulário, que o htmx troca no lugar
+        return ["projects/_create_form.html"] if self.request.htmx else super().get_template_names()
+
+    def form_valid(self, form):
+        response = super().form_valid(form)
+        return HttpResponseClientRedirect(self.success_url) if self.request.htmx else response
 
 
 class ProjectUpdateView(LoginRequiredMixin, SuccessMessageMixin, UpdateView):

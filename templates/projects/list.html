@@ -4,10 +4,17 @@
 {% block title %}Projetos{% endblock %}
 
 {% block content %}
-<div class="py-6">
+{# open: modal de novo projeto visível. Ao abrir, o foco vai para o primeiro campo; ao fechar, volta ao botão. #}
+<div class="py-6"
+     x-data="{
+       open: {{ open_modal|yesno:'true,false' }},
+       show() { this.open = true; this.$nextTick(() => this.$refs.dialog.querySelector('input[type=text]').focus()) },
+       close() { this.open = false; this.$refs.trigger.focus() }
+     }"
+     x-init="if (open) show()" @keydown.escape.window="if (open) close()">
     <div class="mb-6 flex items-center justify-between">
         <h1 class="text-2xl font-semibold tracking-tight text-heading">Projetos</h1>
-        <a href="{% url 'orchestrator:project_create' %}" class="box-border inline-flex items-center justify-center rounded-base border px-4 py-2.5 text-center text-sm font-medium leading-5 shadow-xs focus:outline-none focus:ring-4 border-transparent bg-brand text-white hover:bg-brand-strong focus:ring-brand-medium">
+        <a href="{% url 'orchestrator:project_create' %}" x-ref="trigger" @click.prevent="show()" class="box-border inline-flex items-center justify-center rounded-base border px-4 py-2.5 text-center text-sm font-medium leading-5 shadow-xs focus:outline-none focus:ring-4 border-transparent bg-brand text-white hover:bg-brand-strong focus:ring-brand-medium">
             {% tabler_icon "plus" "me-1.5 h-4 w-4" %}
             Novo projeto
         </a>
@@ -44,5 +51,19 @@
             <p class="mt-1 text-sm text-body">Adicione o repositório em que os agentes vão trabalhar.</p>
         </div>
     {% endif %}
+    <div x-cloak x-show="open" class="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-gray-900/50 p-4 sm:items-center"
+         @click.self="close()">
+        <div x-ref="dialog" role="dialog" aria-modal="true" aria-labelledby="new-project-title"
+             class="w-full max-w-xl rounded-base border border-default bg-neutral-primary-soft p-6 shadow-lg">
+            <div class="mb-5 flex items-center justify-between">
+                <h2 id="new-project-title" class="text-lg font-semibold text-heading">Novo projeto</h2>
+                <button type="button" @click="close()" class="cursor-pointer rounded-base p-1 text-body hover:bg-neutral-tertiary hover:text-heading">
+                    <span class="sr-only">Fechar</span>
+                    {% tabler_icon "x" "h-5 w-5" %}
+                </button>
+            </div>
+            {% include "projects/_create_form.html" %}
+        </div>
+    </div>
 </div>
 {% endblock %}

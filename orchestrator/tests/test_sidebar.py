@@ -16,7 +16,7 @@ class SidebarTests(RunTestCase):
             reverse("orchestrator:run_list") + "?situacao=ativas": "runs",
             run.get_absolute_url(): "runs",
             reverse("orchestrator:approval_list"): "approvals",
-            reverse("orchestrator:project_create"): "projects",
+            reverse("orchestrator:project_list") + "?novo=1": "projects",
             self.agent.get_absolute_url(): "agents",
         }
         for url, section in cases.items():
