@@ -5,6 +5,7 @@ from . import views
 app_name = "orchestrator"
 
 urlpatterns = [
+    path("sidebar/", views.SidebarView.as_view(), name="sidebar"),
     path("projetos/", views.ProjectListView.as_view(), name="project_list"),
     path("projetos/novo/", views.ProjectCreateView.as_view(), name="project_create"),
     path("projetos/<int:pk>/", views.ProjectUpdateView.as_view(), name="project_update"),

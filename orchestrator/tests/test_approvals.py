@@ -42,7 +42,7 @@ class ApprovalFlowTests(RunTestCase):
 
         page = self.client.get(run.get_absolute_url())
         self.assertContains(page, "touch feito.txt")
-        self.assertNotContains(page, "hx-trigger")
+        self.assertNotContains(page, "every 2s")
 
     def test_approving_runs_the_tool_and_finishes(self):
         run = self.start(tool_call("run_command", command="touch feito.txt"), AIMessage(content="Pronto."))

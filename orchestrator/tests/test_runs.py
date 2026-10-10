@@ -108,14 +108,14 @@ class RunViewTests(RunTestCase):
         self.make_run(prompt="tarefa esperando", status=Run.Status.WAITING)
         self.make_run(prompt="tarefa pronta", status=Run.Status.SUCCEEDED)
         url = reverse("orchestrator:run_list")
-        self.assertContains(self.client.get(url), "tarefa ativa")
-        self.assertContains(self.client.get(url), "tarefa pronta")
-        active = self.client.get(url, {"situacao": "ativas"})
-        self.assertContains(active, "tarefa ativa")
-        self.assertContains(active, "tarefa esperando")
-        self.assertNotContains(active, "tarefa pronta")
-        finished = self.client.get(url, {"situacao": "finalizadas"})
-        self.assertNotContains(finished, "tarefa ativa")
+
+        def listed(**params):
+            # Pela lista da tela, não pelo HTML: a sidebar também mostra as execuções recentes
+            return {run.prompt for run in self.client.get(url, params).context["runs"]}
+
+        self.assertEqual(listed(), {"tarefa ativa", "tarefa esperando", "tarefa pronta"})
+        self.assertEqual(listed(situacao="ativas"), {"tarefa ativa", "tarefa esperando"})
+        self.assertEqual(listed(situacao="finalizadas"), {"tarefa pronta"})
 
     def test_detail_polls_only_while_working(self):
         run = self.make_run()
@@ -124,7 +124,7 @@ class RunViewTests(RunTestCase):
         run.result = "Pronto."
         run.save()
         response = self.client.get(run.get_absolute_url())
-        self.assertNotContains(response, "hx-trigger")
+        self.assertNotContains(response, "every 2s")
         self.assertContains(response, "Pronto.")
 
     def test_htmx_request_gets_only_the_progress_fragment(self):

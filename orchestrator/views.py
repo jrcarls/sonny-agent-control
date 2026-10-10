@@ -7,7 +7,7 @@ from django.shortcuts import get_object_or_404, redirect
 from django.urls import reverse_lazy
 from django.utils import timezone
 from django.views import View
-from django.views.generic import CreateView, DeleteView, DetailView, ListView, UpdateView
+from django.views.generic import CreateView, DeleteView, DetailView, ListView, TemplateView, UpdateView
 
 from .forms import AgentForm, ProjectForm, RunForm
 from .models import Agent, Approval, Project, Run, RunEvent
@@ -19,6 +19,12 @@ def enqueue(run, event):
     run.events.create(kind=RunEvent.Kind.STATUS, content=event)
     # Só enfileira depois do commit, para o worker enxergar a execução no banco
     transaction.on_commit(lambda: execute_run.delay(run.pk))
+
+
+class SidebarView(LoginRequiredMixin, TemplateView):
+    """Só o menu lateral, para o htmx atualizar contadores e execuções recentes sem recarregar a página."""
+
+    template_name = "partials/sidebar_nav.html"
 
 
 class ProtectedDeleteMixin:

@@ -77,8 +77,9 @@ class CancelTests(RunTestCase):
     def test_canceled_runs_are_listed_as_finished(self):
         self.make_run(prompt="tarefa cancelada", status=Run.Status.CANCELED)
         url = reverse("orchestrator:run_list")
-        self.assertContains(self.client.get(url, {"situacao": "finalizadas"}), "tarefa cancelada")
-        self.assertNotContains(self.client.get(url, {"situacao": "ativas"}), "tarefa cancelada")
+        # Pela lista da tela, não pelo HTML: a sidebar também mostra as execuções recentes
+        self.assertEqual(len(self.client.get(url, {"situacao": "finalizadas"}).context["runs"]), 1)
+        self.assertEqual(len(self.client.get(url, {"situacao": "ativas"}).context["runs"]), 0)
 
 
 class ResumeAndRetryTests(RunTestCase):
