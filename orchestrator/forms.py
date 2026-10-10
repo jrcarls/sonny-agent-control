@@ -39,7 +39,7 @@ class AgentForm(forms.ModelForm):
             "model": forms.TextInput(attrs={"placeholder": "Escolha uma sugestão ou digite o identificador"}),
             "system_prompt": forms.Textarea(
                 attrs={
-                    "rows": 12,
+                    "rows": 16,
                     "placeholder": (
                         "Ex.: Você revisa pull requests deste projeto. Aponte bugs e riscos antes de estilo, "
                         "cite o arquivo e a linha, e seja direto."

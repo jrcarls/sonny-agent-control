@@ -20,20 +20,21 @@ class AgentFormLayoutTests(AgentFormTestCase):
     def test_new_agent_has_no_active_checkbox_and_is_created_active(self):
         page = self.client.get(self.create_url)
         self.assertNotIn("is_active", page.context["form"].fields)
-        self.assertNotContains(page, "Situação")
+        self.assertNotContains(page, 'name="is_active"')
         self.client.post(self.create_url, {"name": "Revisor", "provider": "anthropic", "model": "claude-sonnet-5-5"})
         self.assertTrue(Agent.objects.get().is_active)
 
     def test_existing_agent_can_be_deactivated(self):
         agent = Agent.objects.create(name="Revisor", provider="anthropic", model="m")
         page = self.client.get(agent.get_absolute_url())
-        self.assertContains(page, "Situação")
+        self.assertContains(page, 'name="is_active"')
         self.assertIn("is_active", page.context["form"].fields)
 
     def test_form_is_split_into_sections(self):
         page = self.client.get(self.create_url)
         for title in ["Identidade", "Modelo", "Comportamento", "Permissões"]:
             self.assertContains(page, f">{title}</h2>")
+        self.assertNotContains(page, ">Delegação</h2>")  # só aparece quando há outro agente para escolher
 
     def test_model_field_offers_suggestions_per_provider(self):
         page = self.client.get(self.create_url)
@@ -63,6 +64,7 @@ class AgentFormLayoutTests(AgentFormTestCase):
         Agent.objects.create(name="Programador", description="Escreve o código", provider="openai", model="m")
         Agent.objects.create(name="Antigo", provider="openai", model="m", is_active=False)
         page = self.client.get(agent.get_absolute_url())
+        self.assertContains(page, ">Delegação</h2>")
         self.assertContains(page, "Escreve o código")
         self.assertContains(page, "Sem papel descrito")
         self.assertContains(page, "inativo")

@@ -3,7 +3,7 @@
 {% block title %}{% if object %}Editar agente{% else %}Novo agente{% endif %}{% endblock %}
 
 {% block content %}
-<div class="max-w-3xl py-6">
+<div class="py-6">
     <h1 class="mb-6 text-2xl font-semibold tracking-tight text-heading">{% if object %}Editar agente{% else %}Novo agente{% endif %}</h1>
     <form method="post" novalidate>
         {% csrf_token %}
@@ -15,6 +15,7 @@
             <h2 class="mb-4 text-lg font-semibold text-heading">Identidade</h2>
             {% include "partials/form_field.html" with field=form.name %}
             {% include "partials/form_field.html" with field=form.description %}
+            {% if form.is_active %}{% include "partials/form_field.html" with field=form.is_active %}{% endif %}
         </section>
 
         {# O provedor escolhido define as sugestões do campo "Modelo" e o aviso de chave ausente #}
@@ -86,38 +87,32 @@
                 </fieldset>
             {% endfor %}
             {% for error in form.tools.errors %}<p class="mt-2 text-sm text-fg-danger-strong">{{ error }}</p>{% endfor %}
-
-            {% if form.delegates %}
-                <fieldset class="mt-6 border-t border-default pt-5">
-                    <legend class="sr-only">{{ form.delegates.label }}</legend>
-                    <p class="text-sm font-medium text-heading">{{ form.delegates.label }}</p>
-                    <p class="mb-3 text-sm text-body">{{ form.delegates.help_text }}</p>
-                    <div class="space-y-2">
-                        {% for option in form.delegates %}
-                            <label for="{{ option.id_for_label }}" class="flex cursor-pointer items-start gap-3 rounded-base border border-default p-3 hover:bg-neutral-secondary-medium">
-                                <input type="checkbox" name="{{ form.delegates.html_name }}" value="{{ option.data.value }}" id="{{ option.id_for_label }}"
-                                       {% if option.data.selected %}checked{% endif %} class="mt-0.5 h-4 w-4 rounded-xs border border-default-medium bg-neutral-secondary-medium focus:ring-2 focus:ring-brand-soft">
-                                <span class="min-w-0 flex-1">
-                                    <span class="flex flex-wrap items-center gap-2 text-sm font-medium text-heading">
-                                        {{ option.data.value.instance.name }}
-                                        {% if not option.data.value.instance.is_active %}<span class="rounded bg-neutral-tertiary px-1.5 py-0.5 text-xs font-medium text-body">inativo</span>{% endif %}
-                                    </span>
-                                    <span class="block text-sm text-body">{% firstof option.data.value.instance.description "Sem papel descrito: os outros agentes não sabem o que delegar a ele." %}</span>
-                                </span>
-                            </label>
-                        {% endfor %}
-                    </div>
-                    {% for error in form.delegates.errors %}<p class="mt-2 text-sm text-fg-danger-strong">{{ error }}</p>{% endfor %}
-                </fieldset>
-            {% endif %}
         </section>
 
-        {% if form.is_active %}
-            <section class="mb-6 rounded-base border border-default bg-neutral-primary-soft p-5 shadow-xs">
-                <h2 class="mb-4 text-lg font-semibold text-heading">Situação</h2>
-                {% include "partials/form_field.html" with field=form.is_active %}
-            </section>
+        {% if form.delegates %}
+            <fieldset class="mb-6 rounded-base border border-default bg-neutral-primary-soft p-5 shadow-xs">
+                <legend class="sr-only">{{ form.delegates.label }}</legend>
+                <h2 class="mb-1 text-lg font-semibold text-heading">Delegação</h2>
+                <p class="mb-4 text-sm text-body">{{ form.delegates.help_text }}</p>
+                <div class="space-y-2">
+                    {% for option in form.delegates %}
+                        <label for="{{ option.id_for_label }}" class="flex cursor-pointer items-start gap-3 rounded-base border border-default p-3 hover:bg-neutral-secondary-medium">
+                            <input type="checkbox" name="{{ form.delegates.html_name }}" value="{{ option.data.value }}" id="{{ option.id_for_label }}"
+                                   {% if option.data.selected %}checked{% endif %} class="mt-0.5 h-4 w-4 rounded-xs border border-default-medium bg-neutral-secondary-medium focus:ring-2 focus:ring-brand-soft">
+                            <span class="min-w-0 flex-1">
+                                <span class="flex flex-wrap items-center gap-2 text-sm font-medium text-heading">
+                                    {{ option.data.value.instance.name }}
+                                    {% if not option.data.value.instance.is_active %}<span class="rounded bg-neutral-tertiary px-1.5 py-0.5 text-xs font-medium text-body">inativo</span>{% endif %}
+                                </span>
+                                <span class="block text-sm text-body">{% firstof option.data.value.instance.description "Sem papel descrito: os outros agentes não sabem o que delegar a ele." %}</span>
+                            </span>
+                        </label>
+                    {% endfor %}
+                </div>
+                {% for error in form.delegates.errors %}<p class="mt-2 text-sm text-fg-danger-strong">{{ error }}</p>{% endfor %}
+            </fieldset>
         {% endif %}
+
 
         <div class="flex items-center gap-3">
             <button type="submit" class="box-border inline-flex items-center justify-center rounded-base border px-4 py-2.5 text-center text-sm font-medium leading-5 shadow-xs focus:outline-none focus:ring-4 border-transparent bg-brand text-white hover:bg-brand-strong focus:ring-brand-medium">Salvar</button>
