@@ -13,7 +13,7 @@
 }
 
 @theme {
-    --font-display: "Orbitron", ui-sans-serif, system-ui, sans-serif;
+    --font-display: "Space Grotesk", ui-sans-serif, system-ui, sans-serif;
     /* Texto do sistema inteiro em Roboto */
     --font-sans: "Roboto", ui-sans-serif, system-ui, -apple-system, "Segoe UI", "Helvetica Neue", Arial, "Noto Sans", sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji";
     --font-body: "Roboto", ui-sans-serif, system-ui, -apple-system, "Segoe UI", "Helvetica Neue", Arial, "Noto Sans", sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji";
