@@ -62,7 +62,7 @@
                     <li>
                         <a href="{{ run.get_absolute_url }}" title="{{ run.get_status_display }}: {{ run.prompt|truncatechars:200 }}" {% if run.get_absolute_url == sidebar.path %}aria-current="page"{% endif %}
                            class="flex items-center px-2 py-1.5 text-sm rounded-lg {% if run.get_absolute_url == sidebar.path %}bg-gray-100 text-gray-900 dark:bg-gray-700 dark:text-white{% else %}text-gray-600 hover:bg-gray-100 hover:text-gray-900 dark:text-gray-300 dark:hover:bg-gray-700 dark:hover:text-white{% endif %}">
-                            <span class="shrink-0 h-2 w-2 rounded-full {% if run.status == "running" %}animate-pulse bg-primary-500{% elif run.status == "waiting_approval" %}bg-amber-500{% elif run.status == "succeeded" %}bg-green-500{% elif run.status == "failed" %}bg-red-500{% else %}bg-gray-300 dark:bg-gray-500{% endif %}"></span>
+                            <span class="shrink-0 h-2 w-2 rounded-full {% if run.status == "running" %}animate-pulse bg-primary-500{% elif run.status == "waiting_approval" %}bg-amber-500{% elif run.status == "succeeded" %}bg-green-500{% elif run.status == "failed" or run.status == "canceled" %}bg-red-500{% elif run.status == "queued" %}bg-yellow-400{% else %}bg-gray-300 dark:bg-gray-500{% endif %}"></span>
                             <span class="ml-2.5 truncate">{{ run.prompt|truncatechars:60 }}</span>
                         </a>
                     </li>
