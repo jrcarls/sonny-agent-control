@@ -1,3 +1,4 @@
+{% load markdown %}
 {# Andamento da execução. Enquanto ela está ativa, o htmx busca este trecho de novo a cada 2s. #}
 <div id="run-progress"
      {% if run.is_working %}hx-get="{{ run.get_absolute_url }}" hx-trigger="every 2s" hx-swap="outerHTML"{% endif %}>
@@ -43,7 +44,7 @@
 
     {% if run.result %}
         <h2 class="mb-3 text-lg font-semibold text-heading">Resultado</h2>
-        <div class="mb-8 whitespace-pre-wrap rounded-base border border-default bg-neutral-primary-soft p-5 text-sm text-heading shadow-xs">{{ run.result }}</div>
+        <div class="markdown mb-8 rounded-base border border-default bg-neutral-primary-soft p-5 text-sm text-heading shadow-xs">{{ run.result|render_markdown }}</div>
     {% endif %}
 
     <h2 class="mb-3 text-lg font-semibold text-heading">Andamento</h2>
@@ -54,7 +55,11 @@
                     <span class="font-medium">{% if event.agent %}{{ event.agent.name }} · {% endif %}{{ event.get_kind_display }}</span>
                     <time datetime="{{ event.created_at|date:"c" }}">{{ event.created_at|date:"H:i:s" }}</time>
                 </div>
-                <p class="whitespace-pre-wrap {% if event.kind != "error" %}text-heading{% endif %} {% if event.kind == "tool_call" or event.kind == "tool_result" %}max-h-64 overflow-auto font-mono text-xs{% endif %}">{{ event.content }}</p>
+                {% if event.kind == "message" %}
+                    <div class="markdown text-heading">{{ event.content|render_markdown }}</div>
+                {% else %}
+                    <p class="whitespace-pre-wrap {% if event.kind != "error" %}text-heading{% endif %} {% if event.kind == "tool_call" or event.kind == "tool_result" %}max-h-64 overflow-auto font-mono text-xs{% endif %}">{{ event.content }}</p>
+                {% endif %}
             </li>
         {% endfor %}
     </ol>
