@@ -1,6 +1,6 @@
 from django import forms
 
-from .models import Agent, Project
+from .models import Agent, Project, Run
 
 
 class ProjectForm(forms.ModelForm):
@@ -25,3 +25,13 @@ class AgentForm(forms.ModelForm):
             "model": "Identificador do modelo no provedor escolhido.",
             "is_active": "Agentes inativos não podem receber novas tarefas.",
         }
+
+
+class RunForm(forms.ModelForm):
+    class Meta:
+        model = Run
+        fields = ["prompt", "project", "agent"]
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields["agent"].queryset = Agent.objects.filter(is_active=True)

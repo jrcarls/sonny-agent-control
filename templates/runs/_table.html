@@ -1,0 +1,27 @@
+{# Tabela de execuções. Uso: {% include "runs/_table.html" with runs=runs %} #}
+<div class="overflow-x-auto rounded-base border border-default bg-neutral-primary-soft shadow-xs">
+    <table class="w-full text-left text-sm text-body">
+        <thead class="border-b border-default bg-neutral-secondary-medium text-sm text-body">
+            <tr>
+                <th scope="col" class="px-6 py-3 font-medium">Tarefa</th>
+                <th scope="col" class="px-6 py-3 font-medium">Projeto</th>
+                <th scope="col" class="px-6 py-3 font-medium">Agente</th>
+                <th scope="col" class="px-6 py-3 font-medium">Situação</th>
+                <th scope="col" class="px-6 py-3 font-medium">Criada em</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for run in runs %}
+                <tr class="border-b border-default last:border-0">
+                    <th scope="row" class="max-w-xs px-6 py-4 font-medium text-heading">
+                        <a href="{{ run.get_absolute_url }}" class="block truncate hover:underline">{{ run.prompt|truncatechars:80 }}</a>
+                    </th>
+                    <td class="px-6 py-4">{{ run.project.name }}</td>
+                    <td class="px-6 py-4">{{ run.agent.name }}</td>
+                    <td class="px-6 py-4">{% include "runs/_status_badge.html" with run=run %}</td>
+                    <td class="whitespace-nowrap px-6 py-4">{{ run.created_at|date:"d/m/Y H:i" }}</td>
+                </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>

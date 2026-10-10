@@ -1,0 +1,5 @@
+{# Etiqueta com a situação de uma execução. Uso: {% include "runs/_status_badge.html" with run=run %} #}
+<span class="inline-flex items-center whitespace-nowrap rounded px-1.5 py-0.5 text-xs font-medium {% if run.status == "succeeded" %}bg-success-soft text-fg-success-strong{% elif run.status == "failed" %}bg-danger-soft text-fg-danger-strong{% elif run.status == "running" %}bg-brand-softer text-fg-brand-strong{% else %}bg-neutral-tertiary text-body{% endif %}">
+    {% if run.status == "running" %}<span class="me-1.5 h-1.5 w-1.5 animate-pulse rounded-full bg-brand"></span>{% endif %}
+    {{ run.get_status_display }}
+</span>

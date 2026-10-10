@@ -1,0 +1,35 @@
+{% extends "layouts/app.html" %}
+{% load tabler_icons %}
+
+{% block title %}Execuções{% endblock %}
+
+{% block content %}
+<div class="mx-auto max-w-4xl py-6">
+    <h1 class="mb-4 text-2xl font-semibold tracking-tight text-heading">Execuções</h1>
+    <nav class="mb-6 flex gap-2" aria-label="Filtrar por situação">
+        <a href="{% url 'orchestrator:run_list' %}" class="{% if not situacao %}rounded-base px-3 py-1.5 text-sm font-medium bg-brand-softer text-fg-brand-strong{% else %}rounded-base px-3 py-1.5 text-sm font-medium text-body hover:bg-neutral-tertiary hover:text-heading{% endif %}">Todas</a>
+        <a href="{% url 'orchestrator:run_list' %}?situacao=ativas" class="{% if situacao == "ativas" %}rounded-base px-3 py-1.5 text-sm font-medium bg-brand-softer text-fg-brand-strong{% else %}rounded-base px-3 py-1.5 text-sm font-medium text-body hover:bg-neutral-tertiary hover:text-heading{% endif %}">Em andamento</a>
+        <a href="{% url 'orchestrator:run_list' %}?situacao=finalizadas" class="{% if situacao == "finalizadas" %}rounded-base px-3 py-1.5 text-sm font-medium bg-brand-softer text-fg-brand-strong{% else %}rounded-base px-3 py-1.5 text-sm font-medium text-body hover:bg-neutral-tertiary hover:text-heading{% endif %}">Finalizadas</a>
+    </nav>
+    {% if runs %}
+        {% include "runs/_table.html" with runs=runs %}
+        {% if is_paginated %}
+            <div class="mt-4 flex items-center justify-between text-sm text-body">
+                <span>Página {{ page_obj.number }} de {{ page_obj.paginator.num_pages }}</span>
+                <span class="flex gap-4">
+                    {% if page_obj.has_previous %}<a href="?situacao={{ situacao }}&page={{ page_obj.previous_page_number }}" class="font-medium text-fg-brand hover:underline">Anterior</a>{% endif %}
+                    {% if page_obj.has_next %}<a href="?situacao={{ situacao }}&page={{ page_obj.next_page_number }}" class="font-medium text-fg-brand hover:underline">Próxima</a>{% endif %}
+                </span>
+            </div>
+        {% endif %}
+    {% else %}
+        <div class="rounded-base border border-dashed border-default-medium p-8 text-center">
+            <span class="mx-auto mb-3 inline-flex h-10 w-10 items-center justify-center rounded-full bg-neutral-tertiary text-body">
+                {% tabler_icon "history" "h-6 w-6" %}
+            </span>
+            <p class="text-sm font-medium text-heading">Nenhuma execução aqui</p>
+            <p class="mt-1 text-sm text-body">Envie uma tarefa pela <a href="{% url 'home' %}" class="font-medium text-fg-brand hover:underline">visão geral</a>.</p>
+        </div>
+    {% endif %}
+</div>
+{% endblock %}

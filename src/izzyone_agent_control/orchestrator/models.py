@@ -1,3 +1,4 @@
+from django.conf import settings
 from django.db import models
 from django.urls import reverse
 
@@ -49,3 +50,60 @@ class Agent(models.Model):
 
     def get_absolute_url(self):
         return reverse("orchestrator:agent_update", args=[self.pk])
+
+
+class Run(models.Model):
+    class Status(models.TextChoices):
+        QUEUED = "queued", "Na fila"
+        RUNNING = "running", "Em andamento"
+        SUCCEEDED = "succeeded", "Concluída"
+        FAILED = "failed", "Falhou"
+
+    ACTIVE_STATUSES = [Status.QUEUED, Status.RUNNING]
+
+    project = models.ForeignKey(Project, verbose_name="projeto", on_delete=models.PROTECT, related_name="runs")
+    agent = models.ForeignKey(Agent, verbose_name="agente", on_delete=models.PROTECT, related_name="runs")
+    prompt = models.TextField("tarefa")
+    status = models.CharField("situação", max_length=20, choices=Status, default=Status.QUEUED)
+    result = models.TextField("resultado", blank=True)
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, verbose_name="criada por", on_delete=models.PROTECT, related_name="runs"
+    )
+    created_at = models.DateTimeField("criada em", auto_now_add=True)
+    started_at = models.DateTimeField("iniciada em", null=True, blank=True)
+    finished_at = models.DateTimeField("finalizada em", null=True, blank=True)
+
+    class Meta:
+        verbose_name = "execução"
+        verbose_name_plural = "execuções"
+        ordering = ["-created_at"]
+
+    def __str__(self):
+        return f"Execução #{self.pk}"
+
+    def get_absolute_url(self):
+        return reverse("orchestrator:run_detail", args=[self.pk])
+
+    @property
+    def is_active(self):
+        return self.status in self.ACTIVE_STATUSES
+
+
+class RunEvent(models.Model):
+    class Kind(models.TextChoices):
+        STATUS = "status", "Situação"
+        MESSAGE = "message", "Mensagem"
+        ERROR = "error", "Erro"
+
+    run = models.ForeignKey(Run, on_delete=models.CASCADE, related_name="events")
+    kind = models.CharField("tipo", max_length=20, choices=Kind)
+    content = models.TextField("conteúdo")
+    created_at = models.DateTimeField("criado em", auto_now_add=True)
+
+    class Meta:
+        verbose_name = "evento"
+        verbose_name_plural = "eventos"
+        ordering = ["created_at", "pk"]
+
+    def __str__(self):
+        return f"{self.get_kind_display()}: {self.content[:50]}"

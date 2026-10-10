@@ -8,38 +8,53 @@
     <h1 class="text-2xl font-semibold tracking-tight text-heading">Olá, {{ user.get_username }}</h1>
     <p class="mt-1 mb-6 text-sm text-body">Descreva uma tarefa e escolha o projeto e o agente que vai executá-la.</p>
 
-    {# Caixa de prompt: sem action até existirem projetos, agentes e execuções #}
-    <form>
+    <form method="post">
+        {% csrf_token %}
         <div class="w-full rounded-base border border-default-medium bg-neutral-secondary-medium shadow-xs">
             <div class="rounded-t-base bg-neutral-secondary-medium px-4 py-3">
                 <label for="prompt" class="sr-only">Tarefa para o agente</label>
                 <textarea id="prompt" name="prompt" rows="4" required
                           class="block w-full resize-none border-0 bg-neutral-secondary-medium px-0 text-sm text-heading placeholder:text-body focus:ring-0"
-                          placeholder="O que você quer que o agente faça?"></textarea>
+                          placeholder="O que você quer que o agente faça?">{{ form.prompt.value|default_if_none:"" }}</textarea>
             </div>
             <div class="flex flex-wrap items-center gap-3 border-t border-default-medium px-3 py-2">
                 <div>
                     <label for="project" class="sr-only">Projeto</label>
-                    <select id="project" name="project" disabled
-                            class="block w-44 cursor-not-allowed rounded-base border border-default-medium bg-neutral-primary-soft px-3 py-2 text-sm text-fg-disabled shadow-xs focus:border-brand focus:ring-brand">
-                        <option selected>Nenhum projeto</option>
+                    <select id="project" name="project" required {% if not can_submit %}disabled{% endif %}
+                            class="{% if can_submit %}block w-44 rounded-base border border-default-medium bg-neutral-primary-soft px-3 py-2 text-sm text-heading shadow-xs focus:border-brand focus:ring-brand{% else %}block w-44 cursor-not-allowed rounded-base border border-default-medium bg-neutral-primary-soft px-3 py-2 text-sm text-fg-disabled shadow-xs focus:border-brand focus:ring-brand{% endif %}">
+                        {% for value, text in form.project.field.choices %}
+                            <option value="{{ value }}" {% if form.project.value|stringformat:"s" == value|stringformat:"s" %}selected{% endif %}>{% if value %}{{ text }}{% else %}Projeto{% endif %}</option>
+                        {% empty %}
+                            <option>Nenhum projeto</option>
+                        {% endfor %}
                     </select>
                 </div>
                 <div>
                     <label for="agent" class="sr-only">Agente</label>
-                    <select id="agent" name="agent" disabled
-                            class="block w-44 cursor-not-allowed rounded-base border border-default-medium bg-neutral-primary-soft px-3 py-2 text-sm text-fg-disabled shadow-xs focus:border-brand focus:ring-brand">
-                        <option selected>Nenhum agente</option>
+                    <select id="agent" name="agent" required {% if not can_submit %}disabled{% endif %}
+                            class="{% if can_submit %}block w-44 rounded-base border border-default-medium bg-neutral-primary-soft px-3 py-2 text-sm text-heading shadow-xs focus:border-brand focus:ring-brand{% else %}block w-44 cursor-not-allowed rounded-base border border-default-medium bg-neutral-primary-soft px-3 py-2 text-sm text-fg-disabled shadow-xs focus:border-brand focus:ring-brand{% endif %}">
+                        {% for value, text in form.agent.field.choices %}
+                            <option value="{{ value }}" {% if form.agent.value|stringformat:"s" == value|stringformat:"s" %}selected{% endif %}>{% if value %}{{ text }}{% else %}Agente{% endif %}</option>
+                        {% empty %}
+                            <option>Nenhum agente</option>
+                        {% endfor %}
                     </select>
                 </div>
-                <button type="submit" disabled
-                        class="ms-auto box-border inline-flex cursor-not-allowed items-center rounded-base border border-default-medium bg-disabled px-4 py-2 text-sm font-medium leading-5 text-fg-disabled shadow-xs focus:outline-none">
+                <button type="submit" {% if not can_submit %}disabled{% endif %}
+                        class="ms-auto box-border inline-flex items-center rounded-base border px-4 py-2 text-sm font-medium leading-5 shadow-xs focus:outline-none {% if can_submit %}cursor-pointer border-transparent bg-brand text-white hover:bg-brand-strong focus:ring-4 focus:ring-brand-medium{% else %}cursor-not-allowed border-default-medium bg-disabled text-fg-disabled{% endif %}">
                     Enviar
                     {% tabler_icon "arrow-up" "ms-1.5 h-4 w-4" %}
                 </button>
             </div>
         </div>
-        <p class="mt-2.5 text-sm text-body">Para enviar, conecte um projeto e crie um agente.</p>
+        {% for field in form %}
+            {% for error in field.errors %}
+                <p class="mt-2.5 text-sm text-fg-danger-strong">{{ field.label|capfirst }}: {{ error }}</p>
+            {% endfor %}
+        {% endfor %}
+        {% if not can_submit %}
+            <p class="mt-2.5 text-sm text-body">Para enviar, <a href="{% url 'orchestrator:project_create' %}" class="font-medium text-fg-brand hover:underline">adicione um projeto</a> e <a href="{% url 'orchestrator:agent_create' %}" class="font-medium text-fg-brand hover:underline">crie um agente</a> ativo.</p>
+        {% endif %}
     </form>
 
     <h2 class="mt-10 mb-4 text-lg font-semibold text-heading">Primeiros passos</h2>
@@ -77,6 +92,9 @@
     </ol>
 
     <h2 class="mt-10 mb-4 text-lg font-semibold text-heading">Atividade recente</h2>
+    {% if recent_runs %}
+        {% include "runs/_table.html" with runs=recent_runs %}
+    {% else %}
     <div class="rounded-base border border-dashed border-default-medium p-8 text-center">
         <span class="mx-auto mb-3 inline-flex h-10 w-10 items-center justify-center rounded-full bg-neutral-tertiary text-body">
             {% tabler_icon "history" "h-6 w-6" %}
@@ -84,5 +102,6 @@
         <p class="text-sm font-medium text-heading">Nenhuma execução ainda</p>
         <p class="mt-1 text-sm text-body">As tarefas enviadas aos agentes aparecem aqui.</p>
     </div>
+    {% endif %}
 </div>
 {% endblock %}
