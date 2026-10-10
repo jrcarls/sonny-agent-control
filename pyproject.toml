@@ -8,6 +8,7 @@ authors = [
 ]
 requires-python = ">=3.14"
 dependencies = [
+    "celery[redis]>=5.6.3",
     "django>=6.1.2",
     "django-allauth>=65.19.7",
     "django-browser-reload>=1.21.0",
@@ -17,6 +18,7 @@ dependencies = [
     "django-htmx>=1.29.0",
     "django-tabler-icons>=0.7.2",
     "pillow>=12.3.0",
+    "psycopg[binary]>=3.3.6",
     "whitenoise>=6.12.0",
 ]
 

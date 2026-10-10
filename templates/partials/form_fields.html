@@ -1,0 +1,48 @@
+{# Campos de um form Django no estilo Flowbite. Uso: {% include "partials/form_fields.html" with form=form %} #}
+{% if form.non_field_errors %}
+    <div class="mb-4 rounded-base bg-danger-soft p-4 text-sm text-fg-danger-strong" role="alert">
+        {{ form.non_field_errors }}
+    </div>
+{% endif %}
+{% for field in form %}
+    {% if field.widget_type == "checkbox" %}
+        <div class="mb-4">
+            <div class="flex items-center">
+                <input type="checkbox" name="{{ field.html_name }}" id="{{ field.id_for_label }}"
+                       {% if field.value %}checked{% endif %}
+                       class="h-4 w-4 rounded-xs border border-default-medium bg-neutral-secondary-medium focus:ring-2 focus:ring-brand-soft">
+                <label for="{{ field.id_for_label }}" class="ms-2 select-none text-sm font-medium text-heading">{{ field.label|capfirst }}</label>
+            </div>
+            {% if field.help_text %}<p class="mt-2 text-sm text-body">{{ field.help_text }}</p>{% endif %}
+        </div>
+    {% else %}
+        <div class="mb-4">
+            <label for="{{ field.id_for_label }}" class="mb-2.5 block text-sm font-medium text-heading">{{ field.label|capfirst }}</label>
+            {% with base="block w-full rounded-base border px-3 py-2.5 text-sm shadow-xs" ok="border-default-medium bg-neutral-secondary-medium text-heading placeholder:text-body focus:border-brand focus:ring-brand" bad="border-danger-subtle bg-danger-soft text-fg-danger-strong placeholder:text-fg-danger-strong focus:border-danger focus:ring-danger" %}
+                {% if field.widget_type == "select" %}
+                    <select name="{{ field.html_name }}" id="{{ field.id_for_label }}" {% if field.field.required %}required{% endif %}
+                            class="{{ base }} {% if field.errors %}{{ bad }}{% else %}{{ ok }}{% endif %}">
+                        {% for value, label in field.field.choices %}
+                            <option value="{{ value }}" {% if field.value|stringformat:"s" == value|stringformat:"s" %}selected{% endif %}>{{ label }}</option>
+                        {% endfor %}
+                    </select>
+                {% elif field.widget_type == "textarea" %}
+                    <textarea name="{{ field.html_name }}" id="{{ field.id_for_label }}" rows="{{ field.field.widget.attrs.rows|default:4 }}"
+                              {% if field.field.required %}required{% endif %}
+                              class="{{ base }} {% if field.errors %}{{ bad }}{% else %}{{ ok }}{% endif %}">{{ field.value|default_if_none:"" }}</textarea>
+                {% else %}
+                    <input type="text" name="{{ field.html_name }}" id="{{ field.id_for_label }}"
+                           value="{{ field.value|default_if_none:"" }}"
+                           {% if field.field.max_length %}maxlength="{{ field.field.max_length }}"{% endif %}
+                           {% if field.field.widget.attrs.placeholder %}placeholder="{{ field.field.widget.attrs.placeholder }}"{% endif %}
+                           {% if field.field.required %}required{% endif %}
+                           class="{{ base }} {% if field.errors %}{{ bad }}{% else %}{{ ok }}{% endif %}">
+                {% endif %}
+            {% endwith %}
+            {% for error in field.errors %}
+                <p class="mt-2 text-sm text-fg-danger-strong">{{ error }}</p>
+            {% endfor %}
+            {% if field.help_text %}<p class="mt-2 text-sm text-body">{{ field.help_text }}</p>{% endif %}
+        </div>
+    {% endif %}
+{% endfor %}

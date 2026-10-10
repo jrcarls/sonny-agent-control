@@ -1,0 +1,57 @@
+{% extends "layouts/app.html" %}
+{% load tabler_icons %}
+
+{% block title %}Agentes{% endblock %}
+
+{% block content %}
+<div class="mx-auto max-w-4xl py-6">
+    <div class="mb-6 flex items-center justify-between">
+        <h1 class="text-2xl font-semibold tracking-tight text-heading">Agentes</h1>
+        <a href="{% url 'orchestrator:agent_create' %}" class="box-border inline-flex items-center justify-center rounded-base border px-4 py-2.5 text-center text-sm font-medium leading-5 shadow-xs focus:outline-none focus:ring-4 border-transparent bg-brand text-white hover:bg-brand-strong focus:ring-brand-medium">
+            {% tabler_icon "plus" "me-1.5 h-4 w-4" %}
+            Novo agente
+        </a>
+    </div>
+    {% if agents %}
+        <div class="overflow-x-auto rounded-base border border-default bg-neutral-primary-soft shadow-xs">
+            <table class="w-full text-left text-sm text-body">
+                <thead class="border-b border-default bg-neutral-secondary-medium text-sm text-body">
+                    <tr>
+                        <th scope="col" class="px-6 py-3 font-medium">Nome</th>
+                        <th scope="col" class="px-6 py-3 font-medium">Provedor</th>
+                        <th scope="col" class="px-6 py-3 font-medium">Modelo</th>
+                        <th scope="col" class="px-6 py-3 font-medium">Situação</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for agent in agents %}
+                        <tr class="border-b border-default last:border-0">
+                            <th scope="row" class="px-6 py-4 font-medium text-heading">
+                                <a href="{{ agent.get_absolute_url }}" class="hover:underline">{{ agent.name }}</a>
+                                {% if agent.description %}<p class="font-normal text-body">{{ agent.description }}</p>{% endif %}
+                            </th>
+                            <td class="px-6 py-4">{{ agent.get_provider_display }}</td>
+                            <td class="px-6 py-4">{{ agent.model }}</td>
+                            <td class="px-6 py-4">
+                                {% if agent.is_active %}
+                                    <span class="rounded bg-success-soft px-1.5 py-0.5 text-xs font-medium text-fg-success-strong">Ativo</span>
+                                {% else %}
+                                    <span class="rounded bg-neutral-tertiary px-1.5 py-0.5 text-xs font-medium text-body">Inativo</span>
+                                {% endif %}
+                            </td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    {% else %}
+        <div class="rounded-base border border-dashed border-default-medium p-8 text-center">
+            <span class="mx-auto mb-3 inline-flex h-10 w-10 items-center justify-center rounded-full bg-neutral-tertiary text-body">
+                {% tabler_icon "robot" "h-6 w-6" %}
+            </span>
+            <p class="text-sm font-medium text-heading">Nenhum agente ainda</p>
+            <p class="mt-1 text-sm text-body">Crie um agente definindo o modelo e as instruções dele.</p>
+        </div>
+    {% endif %}
+</div>
+{% endblock %}

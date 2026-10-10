@@ -5,6 +5,7 @@ from config.views import home
 
 urlpatterns = [
     path("", home, name="home"),
+    path("", include("izzyone_agent_control.orchestrator.urls")),
     path("admin/", admin.site.urls),
     path("accounts/", include("allauth.urls")),
     path("__reload__/", include("django_browser_reload.urls")),

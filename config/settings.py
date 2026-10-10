@@ -28,6 +28,7 @@ INSTALLED_APPS = [
     "debug_toolbar",
     "django_browser_reload",
     "tabler_icons",
+    "izzyone_agent_control.orchestrator",
 ]
 
 AUTHENTICATION_BACKENDS = [
@@ -69,12 +70,15 @@ TEMPLATES = [
 
 WSGI_APPLICATION = "config.wsgi.application"
 
+# Em desenvolvimento o Postgres e o Redis sobem com docker compose up -d
 DATABASES = {
-    "default": {
-        "ENGINE": "django.db.backends.sqlite3",
-        "NAME": BASE_DIR / "db.sqlite3",
-    }
+    "default": env.db("DATABASE_URL", default="postgres://izzyone:izzyone@localhost:5432/izzyone"),
 }
+
+CELERY_BROKER_URL = env("CELERY_BROKER_URL", default="redis://localhost:6379/0")
+CELERY_RESULT_BACKEND = env("CELERY_RESULT_BACKEND", default="redis://localhost:6379/1")
+CELERY_TIMEZONE = "America/Sao_Paulo"
+CELERY_TASK_TRACK_STARTED = True
 
 AUTH_PASSWORD_VALIDATORS = [
     {"NAME": "django.contrib.auth.password_validation.UserAttributeSimilarityValidator"},
@@ -93,9 +97,14 @@ INTERNAL_IPS = ["127.0.0.1"]
 STATIC_URL = "static/"
 STATIC_ROOT = BASE_DIR / "staticfiles"
 STATICFILES_DIRS = [BASE_DIR / "static"]
+# O manifesto só existe depois do collectstatic, então fica restrito a produção;
+# em desenvolvimento e nos testes os arquivos são servidos direto de static/
 STORAGES = {
+    "default": {"BACKEND": "django.core.files.storage.FileSystemStorage"},
     "staticfiles": {
-        "BACKEND": "whitenoise.storage.CompressedManifestStaticFilesStorage",
+        "BACKEND": "django.contrib.staticfiles.storage.StaticFilesStorage"
+        if DEBUG
+        else "whitenoise.storage.CompressedManifestStaticFilesStorage",
     },
 }
 

@@ -53,10 +53,10 @@
               </button>
               <ul id="dropdown-projetos" class="hidden py-2 space-y-2 sm:sidebar-collapsed:hidden" :class="{ 'hidden': !open }">
                   <li>
-                      <a href="#" class="flex items-center p-2 pl-11 w-full text-base font-normal text-gray-900 rounded-lg transition duration-75 hover:bg-gray-100 dark:text-white dark:hover:bg-gray-700">Todos os projetos</a>
+                      <a href="{% url 'orchestrator:project_list' %}" class="flex items-center p-2 pl-11 w-full text-base font-normal text-gray-900 rounded-lg transition duration-75 hover:bg-gray-100 dark:text-white dark:hover:bg-gray-700">Todos os projetos</a>
                   </li>
                   <li>
-                      <a href="#" class="flex items-center p-2 pl-11 w-full text-base font-normal text-gray-900 rounded-lg transition duration-75 hover:bg-gray-100 dark:text-white dark:hover:bg-gray-700">Novo projeto</a>
+                      <a href="{% url 'orchestrator:project_create' %}" class="flex items-center p-2 pl-11 w-full text-base font-normal text-gray-900 rounded-lg transition duration-75 hover:bg-gray-100 dark:text-white dark:hover:bg-gray-700">Novo projeto</a>
                   </li>
               </ul>
           </li>
@@ -68,10 +68,10 @@
               </button>
               <ul id="dropdown-agentes" class="hidden py-2 space-y-2 sm:sidebar-collapsed:hidden" :class="{ 'hidden': !open }">
                   <li>
-                      <a href="#" class="flex items-center p-2 pl-11 w-full text-base font-normal text-gray-900 rounded-lg transition duration-75 hover:bg-gray-100 dark:text-white dark:hover:bg-gray-700">Todos os agentes</a>
+                      <a href="{% url 'orchestrator:agent_list' %}" class="flex items-center p-2 pl-11 w-full text-base font-normal text-gray-900 rounded-lg transition duration-75 hover:bg-gray-100 dark:text-white dark:hover:bg-gray-700">Todos os agentes</a>
                   </li>
                   <li>
-                      <a href="#" class="flex items-center p-2 pl-11 w-full text-base font-normal text-gray-900 rounded-lg transition duration-75 hover:bg-gray-100 dark:text-white dark:hover:bg-gray-700">Novo agente</a>
+                      <a href="{% url 'orchestrator:agent_create' %}" class="flex items-center p-2 pl-11 w-full text-base font-normal text-gray-900 rounded-lg transition duration-75 hover:bg-gray-100 dark:text-white dark:hover:bg-gray-700">Novo agente</a>
                   </li>
               </ul>
           </li>

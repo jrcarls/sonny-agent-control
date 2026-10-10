@@ -2,6 +2,9 @@
 {% block body %}
     {% include "partials/sidebar.html" %}
     <main class="p-4 transition-[margin] sm:ml-64 sm:sidebar-collapsed:ml-16">
+        {% for message in messages %}
+            <div class="mx-auto mb-4 max-w-4xl rounded-base p-4 text-sm {% if message.level_tag == "error" %}bg-danger-soft text-fg-danger-strong{% else %}bg-success-soft text-fg-success-strong{% endif %}" role="alert">{{ message }}</div>
+        {% endfor %}
         {% block content %}{% endblock %}
     </main>
 {% endblock %}
