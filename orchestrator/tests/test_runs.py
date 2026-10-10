@@ -61,7 +61,7 @@ class ExecuteRunTests(RunTestCase):
         system, human = model.calls[0]
         self.assertIn("Seja direto.", system.content)
         self.assertIn(str(self.remote), system.content)
-        self.assertIn(f"izzyone/run-{run.pk}", system.content)
+        self.assertIn(f"sonny/run-{run.pk}", system.content)
         self.assertEqual(human.content, "Resuma o README")
 
     def test_failure_is_recorded(self):

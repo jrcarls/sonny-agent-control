@@ -38,7 +38,7 @@ class Project(models.Model):
 
     def generate_ssh_key(self):
         """Troca o par de chaves (sem salvar). A chave anterior deixa de valer para este projeto."""
-        private, self.ssh_public_key = generate_ssh_keypair(f"izzyone-{self.name}".replace(" ", "-"))
+        private, self.ssh_public_key = generate_ssh_keypair(f"sonny-{self.name}".replace(" ", "-"))
         self.ssh_private_key = encrypt(private)
 
     @property
@@ -136,7 +136,7 @@ class Run(models.Model):
 
     @property
     def branch(self):
-        return f"izzyone/run-{self.pk}"
+        return f"sonny/run-{self.pk}"
 
     @property
     def compare_url(self):

@@ -1,4 +1,4 @@
-# IzzyOne Agentes Control
+# Sonny Agentes Control
 
 Orquestrador de agentes de IA que trabalham em repositórios de código. Você descreve uma tarefa, escolhe o
 projeto e o agente, e acompanha a execução pela interface web. Os agentes podem ler e alterar o código em um
@@ -105,7 +105,7 @@ você abrir o pull request.
 - **Projeto**: um repositório git e a branch de onde as execuções partem.
 - **Agente**: provedor, modelo, instruções, ferramentas habilitadas e para quais agentes ele pode delegar.
 - **Execução**: uma tarefa dada a um agente em um projeto. Roda no worker, em um worktree próprio
-  (`.workspaces/runs/<id>`, branch `izzyone/run-<id>`), com o estado salvo no Postgres a cada passo.
+  (`.workspaces/runs/<id>`, branch `sonny/run-<id>`), com o estado salvo no Postgres a cada passo.
 - **Aprovação**: rodar comando e abrir pull request pausam a execução até alguém aprovar ou negar.
 
 Uma execução pode ser cancelada, continuada do último passo salvo (se falhou) ou repetida do zero.

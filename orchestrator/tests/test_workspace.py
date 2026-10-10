@@ -17,7 +17,7 @@ class WorkspaceTests(RunTestCase):
         first_path, second_path = prepare_workspace(first), prepare_workspace(second)
         self.assertNotEqual(first_path, second_path)
         self.assertEqual((first_path / "README.md").read_text(), "# Site\nProjeto de exemplo.\n")
-        self.assertEqual(git("branch", "--show-current", cwd=first_path).strip(), f"izzyone/run-{first.pk}")
+        self.assertEqual(git("branch", "--show-current", cwd=first_path).strip(), f"sonny/run-{first.pk}")
         (first_path / "novo.txt").write_text("x")
         self.assertFalse((second_path / "novo.txt").exists())
         self.assertFalse((self.remote / "novo.txt").exists())

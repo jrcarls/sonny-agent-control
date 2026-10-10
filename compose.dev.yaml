@@ -2,7 +2,7 @@
 # Uso: docker compose -f compose.yaml -f compose.dev.yaml up
 
 x-dev: &dev
-  image: izzyone-agent-control:dev
+  image: sonny-agent-control:dev
   build:
     target: dev
   volumes:

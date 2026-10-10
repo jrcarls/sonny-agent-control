@@ -37,7 +37,7 @@ class HomeDefaultsTests(RunTestCase):
         page = self.client.get(reverse("home"))
         self.assertContains(page, "Revisor · claude-sonnet-5-5")
         self.assertContains(page, ">Projeto</option>")
-        self.assertContains(page, "<title>Nova tarefa</title>")
+        self.assertContains(page, "<title>Nova tarefa · Sonny</title>")
 
 
 class HomeKeyWarningTests(RunTestCase):

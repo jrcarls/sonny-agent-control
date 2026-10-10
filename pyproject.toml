@@ -1,5 +1,5 @@
 [project]
-name = "izzyone-agent-control"
+name = "sonny-agent-control"
 version = "0.1.0"
 description = "Orquestrador de agentes de IA que trabalham em repositórios de código"
 readme = "README.md"

@@ -15,9 +15,9 @@ HTMX = {"HX-Request": "true"}
 
 class CryptoTests(SimpleTestCase):
     def test_keypair_is_openssh_ed25519(self):
-        private, public = crypto.generate_ssh_keypair("izzyone-Site")
+        private, public = crypto.generate_ssh_keypair("sonny-Site")
         self.assertTrue(private.startswith("-----BEGIN OPENSSH PRIVATE KEY-----"))
-        self.assertRegex(public, r"^ssh-ed25519 \S+ izzyone-Site$")
+        self.assertRegex(public, r"^ssh-ed25519 \S+ sonny-Site$")
 
     def test_encryption_depends_on_the_secret_key(self):
         token = crypto.encrypt("segredo")
