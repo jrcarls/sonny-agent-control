@@ -104,6 +104,11 @@ class Run(models.Model):
     pushed_at = models.DateTimeField("enviada em", null=True, blank=True)
     # Pedido de cancelamento de uma execução em andamento; o worker para no fim do passo atual
     cancel_requested = models.BooleanField(default=False)
+    # Sinal de vida: o worker atualiza este horário enquanto trabalha na execução. Se ele para de
+    # atualizar, é porque o processo morreu, e a execução é dada como falha (tasks.fail_stale_runs).
+    heartbeat_at = models.DateTimeField(null=True, blank=True)
+    # Nome do worker que está (ou esteve por último) com a execução
+    worker = models.CharField(max_length=255, blank=True)
     input_tokens = models.PositiveBigIntegerField("tokens de entrada", default=0)
     output_tokens = models.PositiveBigIntegerField("tokens de saída", default=0)
     created_by = models.ForeignKey(

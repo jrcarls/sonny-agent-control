@@ -1,9 +1,12 @@
+import threading
 from contextlib import contextmanager
 from datetime import timedelta
 
 from celery import shared_task
+from celery.signals import worker_ready
 from django.conf import settings
 from django.db import connection, transaction
+from django.db.models import Q
 from django.utils import timezone
 from langgraph.checkpoint.postgres import PostgresSaver
 from langgraph.types import Command
@@ -15,6 +18,8 @@ from .workspace import prepare_workspace, remove_workspace, workspace_path, work
 
 # Tamanho máximo, em caracteres, do texto guardado em cada evento do andamento
 MAX_EVENT_LENGTH = 4000
+# De quantos em quantos segundos o worker renova o sinal de vida de uma execução
+HEARTBEAT_INTERVAL = 20
 
 
 class TokenLimitExceeded(Exception):
@@ -67,52 +72,82 @@ def _graph_input(run, snapshot):
     return initial_state(run)
 
 
-def _cancel_requested(run):
-    return Run.objects.filter(pk=run.pk, cancel_requested=True).exists()
+@contextmanager
+def _heartbeat(run):
+    """Mantém o sinal de vida da execução em dia enquanto o bloco roda, mesmo durante um passo demorado."""
+    stop = threading.Event()
+
+    def beat():
+        try:
+            while not stop.wait(HEARTBEAT_INTERVAL):
+                Run.objects.filter(pk=run.pk).update(heartbeat_at=timezone.now())
+        finally:
+            connection.close()  # a thread tem a própria conexão com o banco
+
+    thread = threading.Thread(target=beat, name=f"heartbeat-run-{run.pk}", daemon=True)
+    thread.start()
+    try:
+        yield
+    finally:
+        stop.set()
+        thread.join()
 
 
-@shared_task
-def execute_run(run_id):
+@shared_task(bind=True)
+def execute_run(self, run_id):
     """Roda o grafo da execução até ele terminar, parar esperando aprovação ou ser cancelado."""
     # Só começa se estiver na fila: evita rodar duas vezes se a tarefa for reentregue
-    if not Run.objects.filter(pk=run_id, status=Run.Status.QUEUED).update(status=Run.Status.RUNNING):
+    claimed = Run.objects.filter(pk=run_id, status=Run.Status.QUEUED).update(
+        status=Run.Status.RUNNING, heartbeat_at=timezone.now(), worker=self.request.hostname or ""
+    )
+    if not claimed:
         return
     run = Run.objects.select_related("project", "agent").get(pk=run_id)
     if run.started_at is None:
         run.started_at = timezone.now()
         run.save(update_fields=["started_at"])
 
-    result, requested, canceled, error = "", [], False, None
+    result, requested, canceled, taken_away, error = "", [], False, False, None
     try:
-        if not workspace_path(run).exists():
-            run.events.create(kind=RunEvent.Kind.STATUS, content="Preparando o repositório.")
-        workspace = prepare_workspace(run)
-        with open_checkpointer() as checkpointer:
-            graph = build_graph(run, workspace, checkpointer)
-            # thread_id liga o estado salvo do grafo a esta execução
-            config = {"configurable": {"thread_id": str(run.pk)}, "recursion_limit": settings.RUN_MAX_STEPS}
-            graph_input = _graph_input(run, graph.get_state(config))
-            for update in graph.stream(graph_input, config, stream_mode="updates"):
-                for node, node_update in update.items():
-                    if node == "__interrupt__":
-                        requested = node_update[0].value
-                    else:
-                        result = _record_log(run, node_update) or result
-                # O cancelamento vale entre um passo e outro: o passo em curso termina antes
-                if _cancel_requested(run):
-                    canceled = True
-                    break
+        with _heartbeat(run):
+            if not workspace_path(run).exists():
+                run.events.create(kind=RunEvent.Kind.STATUS, content="Preparando o repositório.")
+            workspace = prepare_workspace(run)
+            with open_checkpointer() as checkpointer:
+                graph = build_graph(run, workspace, checkpointer)
+                # thread_id liga o estado salvo do grafo a esta execução
+                config = {"configurable": {"thread_id": str(run.pk)}, "recursion_limit": settings.RUN_MAX_STEPS}
+                graph_input = _graph_input(run, graph.get_state(config))
+                # durability="sync": cada passo só conta como feito depois de gravado no banco, para que
+                # uma execução interrompida à força continue exatamente do último passo concluído
+                for update in graph.stream(graph_input, config, stream_mode="updates", durability="sync"):
+                    for node, node_update in update.items():
+                        if node == "__interrupt__":
+                            requested = node_update[0].value
+                        else:
+                            result = _record_log(run, node_update) or result
+                    # Entre um passo e outro: o pedido de cancelamento vale aqui, e se a execução já não
+                    # está mais em andamento (foi dada como falha por falta de sinal) este worker a larga
+                    status, cancel_requested = Run.objects.values_list("status", "cancel_requested").get(pk=run.pk)
+                    if status != Run.Status.RUNNING:
+                        taken_away = True
+                        break
+                    if cancel_requested:
+                        canceled = True
+                        break
     except Exception as exc:
         error = exc
 
     with transaction.atomic():
         # Mesma trava da tela de cancelar: o pedido chega antes ou depois deste desfecho, nunca no meio
-        cancel_requested = Run.objects.select_for_update().get(pk=run.pk).cancel_requested
+        current = Run.objects.select_for_update().get(pk=run.pk)
+        if taken_away or current.status != Run.Status.RUNNING:
+            return  # outro processo já definiu o desfecho; não sobrescreve
         if error is not None:
             run.events.create(kind=RunEvent.Kind.ERROR, content=f"{type(error).__name__}: {error}")
             run.status = Run.Status.FAILED
             run.finished_at = timezone.now()
-        elif canceled or (requested and cancel_requested):
+        elif canceled or (requested and current.cancel_requested):
             run.mark_canceled()
         elif requested:
             for item in requested:
@@ -128,6 +163,37 @@ def execute_run(run_id):
             run.finished_at = timezone.now()
             run.events.create(kind=RunEvent.Kind.STATUS, content="Execução concluída.")
         run.save(update_fields=["result", "status", "finished_at"])
+
+
+def _fail_orphaned(runs, reason):
+    """Dá como falha execuções "em andamento" que nenhum worker está mais tocando. Devolve quantas."""
+    failed = 0
+    for run in runs.filter(status=Run.Status.RUNNING):
+        # O filtro por situação evita atropelar uma execução que acabou de terminar normalmente
+        if Run.objects.filter(pk=run.pk, status=Run.Status.RUNNING).update(
+            status=Run.Status.FAILED, finished_at=timezone.now()
+        ):
+            run.events.create(
+                kind=RunEvent.Kind.ERROR,
+                content=f"{reason} O trabalho feito até o último passo está salvo: use “Continuar de onde parou”.",
+            )
+            failed += 1
+    return failed
+
+
+@shared_task
+def fail_stale_runs():
+    """Execuções em andamento sem sinal de vida há tempo demais: o worker morreu no meio do trabalho."""
+    cutoff = timezone.now() - timedelta(seconds=settings.RUN_STALE_SECONDS)
+    stale = Run.objects.filter(Q(heartbeat_at__lt=cutoff) | Q(heartbeat_at__isnull=True))
+    return _fail_orphaned(stale, "O worker parou de responder no meio da execução.")
+
+
+@worker_ready.connect
+def _fail_runs_of_restarted_worker(sender, **kwargs):
+    """Ao subir, o worker encerra as execuções que eram dele antes de reiniciar, sem esperar a verificação."""
+    _fail_orphaned(Run.objects.filter(worker=sender.hostname), "O worker foi reiniciado no meio da execução.")
+    fail_stale_runs()
 
 
 @shared_task

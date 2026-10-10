@@ -107,6 +107,11 @@ CELERY_BEAT_SCHEDULE = {
         "task": "orchestrator.tasks.cleanup_workspaces",
         "schedule": crontab(hour=3, minute=0),
     },
+    # Marca como falha as execuções cujo worker morreu no meio do trabalho
+    "fail-stale-runs": {
+        "task": "orchestrator.tasks.fail_stale_runs",
+        "schedule": 60.0,
+    },
 }
 
 # ---------------------------------------------------------------------------
@@ -134,6 +139,8 @@ GOOGLE_API_KEY = env("GOOGLE_API_KEY", default="")
 RUN_MAX_TOKENS = env.int("RUN_MAX_TOKENS", default=2_000_000)
 # Teto de passos do grafo por execução, para um agente em laço não rodar para sempre
 RUN_MAX_STEPS = env.int("RUN_MAX_STEPS", default=100)
+# Segundos sem sinal de vida do worker até uma execução em andamento ser dada como falha
+RUN_STALE_SECONDS = env.int("RUN_STALE_SECONDS", default=120)
 
 # Ferramentas dos agentes
 # Tamanho máximo, em caracteres, do que uma ferramenta devolve ao agente (o resto é cortado)

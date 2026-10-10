@@ -34,7 +34,7 @@ class FakeModel:
     def invoke(self, messages):
         self.calls.append(messages)
         response = self.responses.pop(0)
-        if isinstance(response, Exception):
+        if isinstance(response, BaseException):
             raise response
         if callable(response):
             return response()
