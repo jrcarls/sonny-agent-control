@@ -44,6 +44,16 @@ class ToolTests(RunTestCase):
             self.call("write_file", path="../fora.txt", content="x")
         self.assertFalse((self.workspace.parent / "fora.txt").exists())
 
+    @override_settings(TOOL_MAX_OUTPUT_CHARS=10)
+    def test_output_is_cut_at_the_configured_size(self):
+        self.call("write_file", path="grande.txt", content="x" * 25)
+        self.assertEqual(self.call("read_file", path="grande.txt"), "x" * 10 + "\n… (saída cortada: 15 caracteres omitidos)")
+
+    @override_settings(TOOL_COMMAND_TIMEOUT=1)
+    def test_command_is_stopped_at_the_configured_timeout(self):
+        with self.assertRaisesMessage(ToolError, "passou do limite de 1s"):
+            self.call("run_command", command="sleep 5")
+
     def test_run_command_reports_exit_code_and_output(self):
         output = self.call("run_command", command="echo oi && ls && exit 3")
         self.assertIn("código de saída: 3", output)

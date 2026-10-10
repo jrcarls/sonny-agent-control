@@ -10,9 +10,6 @@ from langchain_core.tools import tool
 
 from .workspace import git
 
-MAX_OUTPUT = 20_000
-COMMAND_TIMEOUT = 300
-
 
 @dataclass(frozen=True)
 class ToolSpec:
@@ -47,9 +44,10 @@ class ToolError(Exception):
 
 
 def _truncate(text):
-    if len(text) <= MAX_OUTPUT:
+    limit = settings.TOOL_MAX_OUTPUT_CHARS
+    if len(text) <= limit:
         return text
-    return text[:MAX_OUTPUT] + f"\n… (saída cortada: {len(text) - MAX_OUTPUT} caracteres omitidos)"
+    return text[:limit] + f"\n… (saída cortada: {len(text) - limit} caracteres omitidos)"
 
 
 def _resolve(workspace, path):
@@ -107,7 +105,7 @@ def build_tools(run, workspace, agent):
             cwd=workspace,
             capture_output=True,
             text=True,
-            timeout=60,
+            timeout=settings.TOOL_SEARCH_TIMEOUT,
         )
         if process.returncode > 1:
             raise ToolError(process.stderr.strip())
@@ -133,11 +131,11 @@ def build_tools(run, workspace, agent):
                 cwd=workspace,
                 capture_output=True,
                 text=True,
-                timeout=COMMAND_TIMEOUT,
+                timeout=settings.TOOL_COMMAND_TIMEOUT,
                 env={**os.environ, "GIT_TERMINAL_PROMPT": "0"},
             )
         except subprocess.TimeoutExpired:
-            raise ToolError(f"O comando passou do limite de {COMMAND_TIMEOUT}s e foi interrompido.") from None
+            raise ToolError(f"O comando passou do limite de {settings.TOOL_COMMAND_TIMEOUT}s e foi interrompido.") from None
         return _truncate(f"código de saída: {process.returncode}\n{process.stdout}{process.stderr}")
 
     @tool
@@ -165,7 +163,7 @@ def build_tools(run, workspace, agent):
             f"https://api.github.com/repos/{repository}/pulls",
             headers={"Authorization": f"Bearer {settings.GITHUB_TOKEN}", "Accept": "application/vnd.github+json"},
             json={"title": title, "body": body, "head": run.branch, "base": project.default_branch},
-            timeout=30,
+            timeout=settings.GITHUB_API_TIMEOUT,
         )
         if response.status_code != 201:
             raise ToolError(f"O GitHub recusou o pull request ({response.status_code}): {response.text[:500]}")

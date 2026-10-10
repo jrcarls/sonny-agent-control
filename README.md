@@ -52,6 +52,10 @@ Tudo vem de variáveis de ambiente, lidas do `.env`. As principais:
 | `RUN_MAX_TOKENS` | Teto de tokens por execução, somando todos os agentes; 0 desliga |
 | `WORKSPACE_RETENTION_DAYS` | Dias que o worktree de uma execução finalizada fica guardado |
 
+Os demais limites e prazos de operação (tempo máximo de um comando, tamanho da saída das ferramentas, passos
+por execução etc.) estão reunidos na seção "Orquestrador" do `config/settings.py`, e cada um aceita uma variável
+de ambiente de mesmo nome.
+
 O worker clona e envia código com as credenciais git da máquina em que roda (chave SSH ou credential helper).
 
 ## Como funciona

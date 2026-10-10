@@ -17,6 +17,11 @@ from .tasks import execute_run
 from .workspace import workspace_path
 
 
+# Itens por página nas listas e execuções recentes mostradas na tela inicial
+PAGE_SIZE = 25
+HOME_RECENT_RUNS = 5
+
+
 def enqueue(run, event):
     run.events.create(kind=RunEvent.Kind.STATUS, content=event)
     # Só enfileira depois do commit, para o worker enxergar a execução no banco
@@ -66,7 +71,7 @@ class HomeView(LoginRequiredMixin, CreateView):
         agents = context["form"].fields["agent"].queryset
         has_project, has_agent, has_run = Project.objects.exists(), agents.exists(), Run.objects.exists()
         context["can_submit"] = has_project and has_agent
-        context["recent_runs"] = Run.objects.select_related("project", "agent")[:5]
+        context["recent_runs"] = Run.objects.select_related("project", "agent")[:HOME_RECENT_RUNS]
         # id do agente -> variável de ambiente que falta, para avisar antes de a execução falhar
         missing = missing_api_keys()
         context["agents_without_key"] = {
@@ -210,7 +215,7 @@ class RunListView(LoginRequiredMixin, ListView):
     model = Run
     template_name = "runs/list.html"
     context_object_name = "runs"
-    paginate_by = 25
+    paginate_by = PAGE_SIZE
     FILTERS = {
         "ativas": {"status__in": Run.ACTIVE_STATUSES},
         "finalizadas": {"status__in": [Run.Status.SUCCEEDED, Run.Status.FAILED, Run.Status.CANCELED]},
@@ -296,7 +301,7 @@ class RunRetryView(LoginRequiredMixin, View):
 class ApprovalListView(LoginRequiredMixin, ListView):
     template_name = "approvals/list.html"
     context_object_name = "approvals"
-    paginate_by = 25
+    paginate_by = PAGE_SIZE
 
     def get_queryset(self):
         queryset = Approval.objects.select_related("run__project", "run__agent", "agent", "decided_by")

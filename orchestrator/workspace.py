@@ -14,14 +14,14 @@ class WorkspaceError(Exception):
     pass
 
 
-def git(*args, cwd, timeout=600):
+def git(*args, cwd):
     # GIT_TERMINAL_PROMPT=0: sem credencial o git falha em vez de ficar esperando digitação
     process = subprocess.run(
         ["git", *args],
         cwd=cwd,
         capture_output=True,
         text=True,
-        timeout=timeout,
+        timeout=settings.GIT_TIMEOUT,
         env={**os.environ, "GIT_TERMINAL_PROMPT": "0"},
     )
     if process.returncode != 0:

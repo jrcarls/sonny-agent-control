@@ -3,6 +3,7 @@
 import os
 import time
 
+from django.conf import settings
 from langchain.chat_models import init_chat_model
 
 from .models import Agent
@@ -34,8 +35,6 @@ MODEL_SUGGESTIONS = {
     Provider.OLLAMA: ["llama3.3", "qwen2.5-coder"],
 }
 
-CHECK_TIMEOUT = 20
-
 
 def missing_api_keys():
     """Provedor -> nome da variável que falta, para os provedores sem chave configurada no servidor."""
@@ -49,7 +48,7 @@ def missing_api_keys():
 def check_model(provider, model):
     """Manda uma mensagem curta ao modelo. Devolve (resposta, segundos); deixa o erro do provedor subir."""
     # Sem repetição e com prazo curto: é um teste rápido feito a partir da tela
-    options = {} if provider == Provider.OLLAMA else {"timeout": CHECK_TIMEOUT, "max_retries": 0}
+    options = {} if provider == Provider.OLLAMA else {"timeout": settings.AGENT_TEST_TIMEOUT, "max_retries": 0}
     chat = init_chat_model(model, model_provider=MODEL_PROVIDERS[provider], **options)
     started = time.monotonic()
     response = chat.invoke("Responda apenas com a palavra: ok")

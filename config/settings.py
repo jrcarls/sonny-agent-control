@@ -92,16 +92,38 @@ CELERY_BEAT_SCHEDULE = {
     },
 }
 
+# ---------------------------------------------------------------------------
+# Orquestrador: limites e prazos de operação do app.
+# Cada um pode ser trocado por uma variável de ambiente de mesmo nome.
+# ---------------------------------------------------------------------------
+
+# Repositórios
 # Clones dos projetos e um worktree por execução; fica fora do controle de versão
 WORKSPACES_DIR = Path(env("WORKSPACES_DIR", default=BASE_DIR / ".workspaces"))
+# Dias que o worktree de uma execução finalizada fica guardado antes da limpeza
+WORKSPACE_RETENTION_DAYS = env.int("WORKSPACE_RETENTION_DAYS", default=7)
+# Prazo, em segundos, de cada comando git (clone, fetch, push)
+GIT_TIMEOUT = env.int("GIT_TIMEOUT", default=600)
 # Autor dos commits feitos pelos agentes e token usado para abrir pull requests
 AGENT_GIT_NAME = env("AGENT_GIT_NAME", default="IzzyOne Agent")
 AGENT_GIT_EMAIL = env("AGENT_GIT_EMAIL", default="agent@izzyone.local")
 GITHUB_TOKEN = env("GITHUB_TOKEN", default="")
-# Dias que o worktree de uma execução finalizada fica guardado antes da limpeza
-WORKSPACE_RETENTION_DAYS = env.int("WORKSPACE_RETENTION_DAYS", default=7)
+GITHUB_API_TIMEOUT = env.int("GITHUB_API_TIMEOUT", default=30)
+
+# Execuções
 # Teto de tokens (entrada + saída, somando todos os agentes) por execução; 0 desliga
 RUN_MAX_TOKENS = env.int("RUN_MAX_TOKENS", default=2_000_000)
+# Teto de passos do grafo por execução, para um agente em laço não rodar para sempre
+RUN_MAX_STEPS = env.int("RUN_MAX_STEPS", default=100)
+
+# Ferramentas dos agentes
+# Tamanho máximo, em caracteres, do que uma ferramenta devolve ao agente (o resto é cortado)
+TOOL_MAX_OUTPUT_CHARS = env.int("TOOL_MAX_OUTPUT_CHARS", default=20_000)
+# Prazo, em segundos, da ferramenta "Rodar comando" e da busca no código
+TOOL_COMMAND_TIMEOUT = env.int("TOOL_COMMAND_TIMEOUT", default=300)
+TOOL_SEARCH_TIMEOUT = env.int("TOOL_SEARCH_TIMEOUT", default=60)
+# Prazo, em segundos, do botão "Testar agente"
+AGENT_TEST_TIMEOUT = env.int("AGENT_TEST_TIMEOUT", default=20)
 
 AUTH_PASSWORD_VALIDATORS = [
     {"NAME": "django.contrib.auth.password_validation.UserAttributeSimilarityValidator"},

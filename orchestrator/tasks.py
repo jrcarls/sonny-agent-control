@@ -13,9 +13,8 @@ from .graph import USAGE, build_graph, initial_state
 from .models import Approval, Run, RunEvent
 from .workspace import prepare_workspace, remove_workspace, workspace_path, workspaces_root
 
+# Tamanho máximo, em caracteres, do texto guardado em cada evento do andamento
 MAX_EVENT_LENGTH = 4000
-# Teto de passos do grafo por execução, para um agente em laço não rodar para sempre
-RECURSION_LIMIT = 100
 
 
 class TokenLimitExceeded(Exception):
@@ -91,7 +90,7 @@ def execute_run(run_id):
         with open_checkpointer() as checkpointer:
             graph = build_graph(run, workspace, checkpointer)
             # thread_id liga o estado salvo do grafo a esta execução
-            config = {"configurable": {"thread_id": str(run.pk)}, "recursion_limit": RECURSION_LIMIT}
+            config = {"configurable": {"thread_id": str(run.pk)}, "recursion_limit": settings.RUN_MAX_STEPS}
             graph_input = _graph_input(run, graph.get_state(config))
             for update in graph.stream(graph_input, config, stream_mode="updates"):
                 for node, node_update in update.items():
