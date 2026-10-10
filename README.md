@@ -66,6 +66,7 @@ Dá para deixar só o banco, a fila e o Mailpit no Docker e rodar o resto na má
 ```bash
 docker compose up -d postgres redis mailpit
 uv sync && npm install && npm run build
+uv run django_tabler_icons download --yes   # ícones da interface, baixados uma vez por máquina
 uv run python manage.py migrate
 uv run python manage.py runserver        # interface web
 uv run celery -A config worker -l info   # executa os agentes (outro terminal)

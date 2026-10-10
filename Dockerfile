@@ -35,11 +35,15 @@ ENTRYPOINT ["/app/docker/entrypoint.sh"]
 # --- Desenvolvimento: dependências de dev; o código vem do bind mount -----------
 FROM base AS dev
 RUN uv sync --frozen
+# A biblioteca de ícones não traz os arquivos no pacote: baixa o conjunto para a pasta do usuário
+RUN django_tabler_icons download --yes
 CMD ["python", "manage.py", "runserver", "0.0.0.0:8000"]
 
 # --- Produção: sem dependências de dev, código e arquivos estáticos na imagem ---
 FROM base AS prod
 RUN uv sync --frozen --no-dev
+# A biblioteca de ícones não traz os arquivos no pacote: baixa o conjunto para a pasta do usuário
+RUN django_tabler_icons download --yes
 COPY --chown=app:app . .
 COPY --from=assets --chown=app:app /build/static/css/output.css static/css/output.css
 # O collectstatic só precisa do settings carregar; a chave de verdade vem do ambiente ao rodar.
