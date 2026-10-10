@@ -1,0 +1,55 @@
+{% load allauth %}
+{% if attrs.type == "hidden" %}
+    <input type="hidden"
+           {% if attrs.name %}name="{{ attrs.name }}"{% endif %}
+           {% if attrs.id %}id="{{ attrs.id }}"{% endif %}
+           {% if attrs.value is not None %}value="{{ attrs.value }}"{% endif %}>
+{% elif attrs.type == "checkbox" or attrs.type == "radio" %}
+    <div class="mb-4">
+        <div class="flex items-center">
+            <input {% if attrs.required %}required{% endif %}
+               {% if attrs.disabled %}disabled{% endif %}
+               {% if attrs.readonly %}readonly{% endif %}
+               {% if attrs.name %}name="{{ attrs.name }}"{% endif %}
+               {% if attrs.id %}id="{{ attrs.id }}"{% endif %}
+               {% if attrs.checked or attrs.type == "checkbox" and attrs.value is True %}checked{% endif %}
+               {% if attrs.type == "radio" and attrs.value is not None %}value="{{ attrs.value }}"{% endif %}
+               type="{{ attrs.type }}"
+               class="h-4 w-4 border border-default-medium bg-neutral-secondary-medium focus:ring-2 focus:ring-brand-soft {% if attrs.type == "radio" %}rounded-full{% else %}rounded-xs{% endif %}">
+            <label for="{{ attrs.id }}" class="ms-2 select-none text-sm font-medium text-heading">
+                {% slot label %}
+                {% endslot %}
+            </label>
+        </div>
+        {% include "allauth/elements/field_footer.html" %}
+    </div>
+{% else %}
+    <div class="mb-4">
+        <label for="{{ attrs.id }}" class="mb-2.5 block text-sm font-medium text-heading">
+            {% slot label %}
+            {% endslot %}
+        </label>
+        {% if attrs.type == "textarea" %}
+            <textarea {% if attrs.required %}required{% endif %}
+               {% if attrs.disabled %}disabled{% endif %}
+               {% if attrs.readonly %}readonly{% endif %}
+               {% if attrs.name %}name="{{ attrs.name }}"{% endif %}
+               {% if attrs.id %}id="{{ attrs.id }}"{% endif %}
+               {% if attrs.rows %}rows="{{ attrs.rows }}"{% endif %}
+               {% if attrs.placeholder %}placeholder="{{ attrs.placeholder }}"{% endif %}
+               class="block w-full rounded-base border px-3 py-2.5 text-sm shadow-xs {% if attrs.errors %}border-danger-subtle bg-danger-soft text-fg-danger-strong placeholder:text-fg-danger-strong focus:border-danger focus:ring-danger{% else %}border-default-medium bg-neutral-secondary-medium text-heading placeholder:text-body focus:border-brand focus:ring-brand{% endif %}">{% slot value %}{% endslot %}</textarea>
+        {% else %}
+            <input {% if attrs.required %}required{% endif %}
+               {% if attrs.disabled %}disabled{% endif %}
+               {% if attrs.readonly %}readonly{% endif %}
+               {% if attrs.name %}name="{{ attrs.name }}"{% endif %}
+               {% if attrs.id %}id="{{ attrs.id }}"{% endif %}
+               {% if attrs.placeholder %}placeholder="{{ attrs.placeholder }}"{% endif %}
+               {% if attrs.autocomplete %}autocomplete="{{ attrs.autocomplete }}"{% endif %}
+               {% if attrs.value is not None and attrs.type != "password" %}value="{{ attrs.value }}"{% endif %}
+               type="{{ attrs.type }}"
+               class="block w-full rounded-base border px-3 py-2.5 text-sm shadow-xs {% if attrs.errors %}border-danger-subtle bg-danger-soft text-fg-danger-strong placeholder:text-fg-danger-strong focus:border-danger focus:ring-danger{% else %}border-default-medium bg-neutral-secondary-medium text-heading placeholder:text-body focus:border-brand focus:ring-brand{% endif %}">
+        {% endif %}
+        {% include "allauth/elements/field_footer.html" %}
+    </div>
+{% endif %}

@@ -1,0 +1,6 @@
+{% load allauth %}
+<span class="rounded px-1.5 py-0.5 text-xs font-medium {% if 'success' in attrs.tags %}bg-success-soft text-fg-success-strong{% elif 'danger' in attrs.tags %}bg-danger-soft text-fg-danger-strong{% elif 'warning' in attrs.tags %}bg-warning-soft text-fg-warning{% else %}bg-brand-softer text-fg-brand-strong{% endif %}"
+      {% if attrs.title %}title="{{ attrs.title }}"{% endif %}>
+    {% slot %}
+    {% endslot %}
+</span>

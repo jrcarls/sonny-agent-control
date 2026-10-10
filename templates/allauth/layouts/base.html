@@ -1,0 +1,15 @@
+{% extends "base.html" %}
+{% block title %}{% block head_title %}{% endblock %}{% endblock %}
+{% block body %}
+    <main class="flex min-h-screen flex-col items-center justify-center bg-neutral-secondary-soft px-4 py-8">
+        <div class="w-full max-w-md">
+            {% for message in messages %}
+                <div class="p-4 mb-4 text-sm rounded-base {% if 'error' in message.tags %}text-fg-danger-strong bg-danger-soft{% elif 'success' in message.tags %}text-fg-success-strong bg-success-soft{% elif 'warning' in message.tags %}text-fg-warning bg-warning-soft{% else %}text-fg-brand-strong bg-brand-softer{% endif %}"
+                     role="alert">{{ message }}</div>
+            {% endfor %}
+            <div class="bg-neutral-primary-soft border border-default rounded-base shadow-xs p-6 sm:p-8 [&_a:not([class])]:font-medium [&_a:not([class])]:text-fg-brand [&_a:not([class])]:hover:underline">
+                {% block content %}{% endblock %}
+            </div>
+        </div>
+    </main>
+{% endblock %}

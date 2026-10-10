@@ -1,0 +1,6 @@
+{% load allauth %}
+<div class="p-4 mb-4 text-sm rounded-base {% if 'error' in attrs.level or 'danger' in attrs.tags %}text-fg-danger-strong bg-danger-soft{% elif 'success' in attrs.level %}text-fg-success-strong bg-success-soft{% elif 'warning' in attrs.level %}text-fg-warning bg-warning-soft{% else %}text-fg-brand-strong bg-brand-softer{% endif %}"
+     role="alert">
+    {% slot message %}
+    {% endslot %}
+</div>

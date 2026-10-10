@@ -1,0 +1,28 @@
+[project]
+name = "izzyone-agent-control"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+authors = [
+    { name = "Jean Reis", email = "jeanreis@zohomail.com" }
+]
+requires-python = ">=3.14"
+dependencies = [
+    "django>=6.1.2",
+    "django-allauth>=65.19.7",
+    "django-browser-reload>=1.21.0",
+    "django-cotton>=2.7.2",
+    "django-debug-toolbar>=8.0.0",
+    "django-environ>=0.14.0",
+    "django-htmx>=1.29.0",
+    "django-tabler-icons>=0.7.2",
+    "pillow>=12.3.0",
+    "whitenoise>=6.12.0",
+]
+
+[project.scripts]
+izzyone-agent-control = "izzyone_agent_control:main"
+
+[build-system]
+requires = ["uv_build>=0.13.0,<0.14.0"]
+build-backend = "uv_build"

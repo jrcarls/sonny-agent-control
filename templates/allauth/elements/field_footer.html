@@ -1,0 +1,10 @@
+{% load allauth %}
+{% for error in attrs.errors %}
+    <p class="mt-2.5 text-sm text-fg-danger-strong">{{ error }}</p>
+{% endfor %}
+{% if slots.help_text %}
+    <div class="mt-2.5 text-sm text-body [&_ul]:list-disc [&_ul]:space-y-1 [&_ul]:ps-5">
+        {% slot help_text %}
+        {% endslot %}
+    </div>
+{% endif %}
