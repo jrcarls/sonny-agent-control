@@ -80,6 +80,13 @@ CELERY_RESULT_BACKEND = env("CELERY_RESULT_BACKEND", default="redis://localhost:
 CELERY_TIMEZONE = "America/Sao_Paulo"
 CELERY_TASK_TRACK_STARTED = True
 
+# Clones dos projetos e um worktree por execução; fica fora do controle de versão
+WORKSPACES_DIR = Path(env("WORKSPACES_DIR", default=BASE_DIR / ".workspaces"))
+# Autor dos commits feitos pelos agentes e token usado para abrir pull requests
+AGENT_GIT_NAME = env("AGENT_GIT_NAME", default="IzzyOne Agent")
+AGENT_GIT_EMAIL = env("AGENT_GIT_EMAIL", default="agent@izzyone.local")
+GITHUB_TOKEN = env("GITHUB_TOKEN", default="")
+
 AUTH_PASSWORD_VALIDATORS = [
     {"NAME": "django.contrib.auth.password_validation.UserAttributeSimilarityValidator"},
     {"NAME": "django.contrib.auth.password_validation.MinimumLengthValidator"},

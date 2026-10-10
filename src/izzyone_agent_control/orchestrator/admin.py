@@ -1,6 +1,6 @@
 from django.contrib import admin
 
-from .models import Agent, Project, Run, RunEvent
+from .models import Agent, Approval, Project, Run, RunEvent
 
 
 @admin.register(Project)
@@ -28,3 +28,9 @@ class RunAdmin(admin.ModelAdmin):
     list_display = ["pk", "project", "agent", "status", "created_at"]
     list_filter = ["status", "project", "agent"]
     inlines = [RunEventInline]
+
+
+@admin.register(Approval)
+class ApprovalAdmin(admin.ModelAdmin):
+    list_display = ["pk", "run", "tool_name", "status", "decided_by", "created_at"]
+    list_filter = ["status", "tool_name"]

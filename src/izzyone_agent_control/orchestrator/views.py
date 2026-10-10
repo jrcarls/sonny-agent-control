@@ -3,12 +3,14 @@ from django.contrib.auth.mixins import LoginRequiredMixin
 from django.contrib.messages.views import SuccessMessageMixin
 from django.db import transaction
 from django.db.models import ProtectedError
-from django.shortcuts import redirect
+from django.shortcuts import get_object_or_404, redirect
 from django.urls import reverse_lazy
+from django.utils import timezone
+from django.views import View
 from django.views.generic import CreateView, DeleteView, DetailView, ListView, UpdateView
 
 from .forms import AgentForm, ProjectForm, RunForm
-from .models import Agent, Project, Run, RunEvent
+from .models import Agent, Approval, Project, Run, RunEvent
 from .tasks import execute_run
 
 
@@ -127,6 +129,55 @@ class RunDetailView(LoginRequiredMixin, DetailView):
     queryset = Run.objects.select_related("project", "agent")
     context_object_name = "run"
 
+    def get_context_data(self, **kwargs):
+        pending = self.object.approvals.filter(status=Approval.Status.PENDING)
+        return super().get_context_data(**kwargs, pending_approvals=pending)
+
     def get_template_names(self):
         # A tela consulta este mesmo endereço via htmx enquanto a execução está ativa
         return ["runs/_progress.html"] if self.request.htmx else ["runs/detail.html"]
+
+
+class ApprovalListView(LoginRequiredMixin, ListView):
+    template_name = "approvals/list.html"
+    context_object_name = "approvals"
+    paginate_by = 25
+
+    def get_queryset(self):
+        queryset = Approval.objects.select_related("run__project", "run__agent", "decided_by")
+        if self.request.GET.get("situacao") == "historico":
+            return queryset.exclude(status=Approval.Status.PENDING)
+        return queryset.filter(status=Approval.Status.PENDING)
+
+    def get_context_data(self, **kwargs):
+        return super().get_context_data(**kwargs, situacao=self.request.GET.get("situacao", ""))
+
+
+class ApprovalDecideView(LoginRequiredMixin, View):
+    """Aprova ou nega um pedido. Com o último pedido pendente decidido, a execução volta para a fila."""
+
+    def post(self, request, pk):
+        approval = get_object_or_404(Approval.objects.select_related("run"), pk=pk)
+        approved = request.POST.get("decision") == "approve"
+        status = Approval.Status.APPROVED if approved else Approval.Status.REJECTED
+        with transaction.atomic():
+            # Trava a execução: decisões simultâneas de pedidos diferentes passam uma de cada vez,
+            # senão cada uma veria a outra como pendente e a execução nunca voltaria para a fila
+            run = Run.objects.select_for_update().get(pk=approval.run_id)
+            # O filtro por pendente garante que dois cliques simultâneos não decidem duas vezes
+            decided = Approval.objects.filter(pk=pk, status=Approval.Status.PENDING).update(
+                status=status, decided_by=request.user, decided_at=timezone.now()
+            )
+            if decided:
+                verb = "aprovou" if approved else "negou"
+                run.events.create(
+                    kind=RunEvent.Kind.STATUS, content=f"{request.user.get_username()} {verb}: {approval.tool_label}."
+                )
+                still_pending = run.approvals.filter(status=Approval.Status.PENDING).exists()
+                if not still_pending and Run.objects.filter(pk=run.pk, status=Run.Status.WAITING).update(
+                    status=Run.Status.QUEUED
+                ):
+                    transaction.on_commit(lambda: execute_run.delay(run.pk))
+        if not decided:
+            messages.error(request, "Esse pedido já tinha sido decidido.")
+        return redirect(run)

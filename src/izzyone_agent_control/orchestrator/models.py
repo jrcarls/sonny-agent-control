@@ -2,6 +2,8 @@ from django.conf import settings
 from django.db import models
 from django.urls import reverse
 
+from .tools import TOOL_SPECS
+
 
 class Project(models.Model):
     name = models.CharField("nome", max_length=100, unique=True)
@@ -36,6 +38,8 @@ class Agent(models.Model):
     provider = models.CharField("provedor", max_length=20, choices=Provider)
     model = models.CharField("modelo", max_length=100)
     system_prompt = models.TextField("instruções", blank=True)
+    # Nomes das ferramentas habilitadas (chaves de tools.TOOL_SPECS)
+    tools = models.JSONField("ferramentas", default=list, blank=True)
     is_active = models.BooleanField("ativo", default=True)
     created_at = models.DateTimeField("criado em", auto_now_add=True)
     updated_at = models.DateTimeField("atualizado em", auto_now=True)
@@ -56,16 +60,18 @@ class Run(models.Model):
     class Status(models.TextChoices):
         QUEUED = "queued", "Na fila"
         RUNNING = "running", "Em andamento"
+        WAITING = "waiting_approval", "Aguardando aprovação"
         SUCCEEDED = "succeeded", "Concluída"
         FAILED = "failed", "Falhou"
 
-    ACTIVE_STATUSES = [Status.QUEUED, Status.RUNNING]
+    ACTIVE_STATUSES = [Status.QUEUED, Status.RUNNING, Status.WAITING]
 
     project = models.ForeignKey(Project, verbose_name="projeto", on_delete=models.PROTECT, related_name="runs")
     agent = models.ForeignKey(Agent, verbose_name="agente", on_delete=models.PROTECT, related_name="runs")
     prompt = models.TextField("tarefa")
     status = models.CharField("situação", max_length=20, choices=Status, default=Status.QUEUED)
     result = models.TextField("resultado", blank=True)
+    pull_request_url = models.URLField("pull request", blank=True)
     created_by = models.ForeignKey(
         settings.AUTH_USER_MODEL, verbose_name="criada por", on_delete=models.PROTECT, related_name="runs"
     )
@@ -85,14 +91,21 @@ class Run(models.Model):
         return reverse("orchestrator:run_detail", args=[self.pk])
 
     @property
-    def is_active(self):
-        return self.status in self.ACTIVE_STATUSES
+    def is_working(self):
+        """Na fila ou rodando: a tela da execução se atualiza sozinha enquanto isso."""
+        return self.status in [self.Status.QUEUED, self.Status.RUNNING]
+
+    @property
+    def branch(self):
+        return f"izzyone/run-{self.pk}"
 
 
 class RunEvent(models.Model):
     class Kind(models.TextChoices):
         STATUS = "status", "Situação"
         MESSAGE = "message", "Mensagem"
+        TOOL_CALL = "tool_call", "Ferramenta"
+        TOOL_RESULT = "tool_result", "Resultado da ferramenta"
         ERROR = "error", "Erro"
 
     run = models.ForeignKey(Run, on_delete=models.CASCADE, related_name="events")
@@ -107,3 +120,42 @@ class RunEvent(models.Model):
 
     def __str__(self):
         return f"{self.get_kind_display()}: {self.content[:50]}"
+
+
+class Approval(models.Model):
+    """Pedido de autorização para uma chamada de ferramenta sensível feita por um agente."""
+
+    class Status(models.TextChoices):
+        PENDING = "pending", "Pendente"
+        APPROVED = "approved", "Aprovada"
+        REJECTED = "rejected", "Negada"
+
+    run = models.ForeignKey(Run, verbose_name="execução", on_delete=models.CASCADE, related_name="approvals")
+    tool_call_id = models.CharField(max_length=255)
+    tool_name = models.CharField("ferramenta", max_length=100)
+    tool_args = models.JSONField("argumentos", default=dict)
+    status = models.CharField("situação", max_length=20, choices=Status, default=Status.PENDING)
+    decided_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        verbose_name="decidida por",
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="approvals",
+    )
+    decided_at = models.DateTimeField("decidida em", null=True, blank=True)
+    created_at = models.DateTimeField("criada em", auto_now_add=True)
+
+    class Meta:
+        verbose_name = "aprovação"
+        verbose_name_plural = "aprovações"
+        ordering = ["-created_at", "-pk"]
+        constraints = [models.UniqueConstraint(fields=["run", "tool_call_id"], name="unique_approval_per_tool_call")]
+
+    def __str__(self):
+        return f"{self.tool_label} ({self.run})"
+
+    @property
+    def tool_label(self):
+        spec = TOOL_SPECS.get(self.tool_name)
+        return spec.label if spec else self.tool_name

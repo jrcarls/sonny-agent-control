@@ -1,6 +1,7 @@
 from django import forms
 
 from .models import Agent, Project, Run
+from .tools import DEFAULT_TOOLS, TOOL_SPECS
 
 
 class ProjectForm(forms.ModelForm):
@@ -14,9 +15,21 @@ class ProjectForm(forms.ModelForm):
 
 
 class AgentForm(forms.ModelForm):
+    tools = forms.MultipleChoiceField(
+        label="Ferramentas",
+        required=False,
+        widget=forms.CheckboxSelectMultiple,
+        choices=[
+            (name, f"{spec.label}: {spec.description}" + (" Pede aprovação a cada uso." if spec.requires_approval else ""))
+            for name, spec in TOOL_SPECS.items()
+        ],
+        initial=DEFAULT_TOOLS,
+        help_text="Sem ferramentas, o agente só responde em texto.",
+    )
+
     class Meta:
         model = Agent
-        fields = ["name", "description", "provider", "model", "system_prompt", "is_active"]
+        fields = ["name", "description", "provider", "model", "system_prompt", "tools", "is_active"]
         widgets = {
             "description": forms.TextInput(attrs={"placeholder": "Ex.: revisa pull requests"}),
             "system_prompt": forms.Textarea(attrs={"rows": 8}),

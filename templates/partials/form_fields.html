@@ -15,6 +15,22 @@
             </div>
             {% if field.help_text %}<p class="mt-2 text-sm text-body">{{ field.help_text }}</p>{% endif %}
         </div>
+    {% elif field.widget_type == "checkboxselectmultiple" %}
+        <fieldset class="mb-4">
+            <legend class="mb-2.5 block text-sm font-medium text-heading">{{ field.label|capfirst }}</legend>
+            {% for value, label in field.field.choices %}
+                <div class="mb-2 flex items-start">
+                    <input type="checkbox" name="{{ field.html_name }}" value="{{ value }}" id="{{ field.auto_id }}_{{ forloop.counter0 }}"
+                           {% if value in field.value %}checked{% endif %}
+                           class="mt-0.5 h-4 w-4 rounded-xs border border-default-medium bg-neutral-secondary-medium focus:ring-2 focus:ring-brand-soft">
+                    <label for="{{ field.auto_id }}_{{ forloop.counter0 }}" class="ms-2 select-none text-sm text-heading">{{ label }}</label>
+                </div>
+            {% endfor %}
+            {% for error in field.errors %}
+                <p class="mt-2 text-sm text-fg-danger-strong">{{ error }}</p>
+            {% endfor %}
+            {% if field.help_text %}<p class="mt-2 text-sm text-body">{{ field.help_text }}</p>{% endif %}
+        </fieldset>
     {% else %}
         <div class="mb-4">
             <label for="{{ field.id_for_label }}" class="mb-2.5 block text-sm font-medium text-heading">{{ field.label|capfirst }}</label>

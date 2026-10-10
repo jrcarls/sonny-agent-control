@@ -98,10 +98,10 @@
               </button>
               <ul id="dropdown-aprovacoes" class="hidden py-2 space-y-2 sm:sidebar-collapsed:hidden" :class="{ 'hidden': !open }">
                   <li>
-                      <a href="#" class="flex items-center p-2 pl-11 w-full text-base font-normal text-gray-900 rounded-lg transition duration-75 hover:bg-gray-100 dark:text-white dark:hover:bg-gray-700">Pendentes</a>
+                      <a href="{% url 'orchestrator:approval_list' %}" class="flex items-center p-2 pl-11 w-full text-base font-normal text-gray-900 rounded-lg transition duration-75 hover:bg-gray-100 dark:text-white dark:hover:bg-gray-700">Pendentes</a>
                   </li>
                   <li>
-                      <a href="#" class="flex items-center p-2 pl-11 w-full text-base font-normal text-gray-900 rounded-lg transition duration-75 hover:bg-gray-100 dark:text-white dark:hover:bg-gray-700">Histórico</a>
+                      <a href="{% url 'orchestrator:approval_list' %}?situacao=historico" class="flex items-center p-2 pl-11 w-full text-base font-normal text-gray-900 rounded-lg transition duration-75 hover:bg-gray-100 dark:text-white dark:hover:bg-gray-700">Histórico</a>
                   </li>
               </ul>
           </li>
