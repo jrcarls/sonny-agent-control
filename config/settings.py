@@ -29,7 +29,7 @@ INSTALLED_APPS = [
     "debug_toolbar",
     "django_browser_reload",
     "tabler_icons",
-    "izzyone_agent_control.orchestrator",
+    "orchestrator",
 ]
 
 AUTHENTICATION_BACKENDS = [
@@ -86,7 +86,7 @@ CELERY_WORKER_PREFETCH_MULTIPLIER = 1
 # Rodado pelo "celery beat": limpeza diária dos worktrees antigos
 CELERY_BEAT_SCHEDULE = {
     "cleanup-workspaces": {
-        "task": "izzyone_agent_control.orchestrator.tasks.cleanup_workspaces",
+        "task": "orchestrator.tasks.cleanup_workspaces",
         "schedule": crontab(hour=3, minute=0),
     },
 }

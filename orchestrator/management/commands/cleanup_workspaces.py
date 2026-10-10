@@ -1,6 +1,6 @@
 from django.core.management.base import BaseCommand
 
-from izzyone_agent_control.orchestrator.tasks import cleanup_workspaces
+from orchestrator.tasks import cleanup_workspaces
 
 
 class Command(BaseCommand):

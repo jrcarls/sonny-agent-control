@@ -67,7 +67,7 @@ class ExecuteRunTests(RunTestCase):
     def test_failure_is_recorded(self):
         run = self.make_run()
         with mock.patch(
-            "izzyone_agent_control.orchestrator.graph.build_chat_model", side_effect=RuntimeError("sem chave")
+            "orchestrator.graph.build_chat_model", side_effect=RuntimeError("sem chave")
         ):
             tasks.execute_run(run.pk)
         run.refresh_from_db()
@@ -85,7 +85,7 @@ class ExecuteRunTests(RunTestCase):
 
     def test_run_that_already_started_is_not_executed_again(self):
         run = self.make_run(status=Run.Status.RUNNING)
-        with mock.patch("izzyone_agent_control.orchestrator.graph.build_chat_model") as build:
+        with mock.patch("orchestrator.graph.build_chat_model") as build:
             tasks.execute_run(run.pk)
         build.assert_not_called()
         self.assertFalse(run.events.exists())

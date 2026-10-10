@@ -95,7 +95,7 @@ class PullRequestToolTests(RunTestCase):
     def open_pr(self, status_code=201):
         response = mock.Mock(status_code=status_code, text="erro do github")
         response.json.return_value = {"html_url": "https://github.com/org/site/pull/7"}
-        with mock.patch("izzyone_agent_control.orchestrator.tools.httpx.post", return_value=response) as post:
+        with mock.patch("orchestrator.tools.httpx.post", return_value=response) as post:
             result = self.tools["open_pull_request"].invoke({"title": "Adiciona página", "body": "Detalhes"})
         return result, post
 

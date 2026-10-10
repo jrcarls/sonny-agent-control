@@ -46,13 +46,13 @@ def tool_call(name, call_id="call_1", **args):
 
 
 def use_model(model):
-    return mock.patch("izzyone_agent_control.orchestrator.graph.build_chat_model", return_value=model)
+    return mock.patch("orchestrator.graph.build_chat_model", return_value=model)
 
 
 def use_models(models):
     """Um modelo de mentira por agente, escolhido pelo nome do agente."""
     return mock.patch(
-        "izzyone_agent_control.orchestrator.graph.build_chat_model", side_effect=lambda agent: models[agent.name]
+        "orchestrator.graph.build_chat_model", side_effect=lambda agent: models[agent.name]
     )
 
 

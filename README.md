@@ -71,7 +71,7 @@ Uma execução pode ser cancelada, continuada do último passo salvo (se falhou)
 
 ```
 config/                              settings, urls e a configuração do Celery
-src/izzyone_agent_control/orchestrator/
+orchestrator/                        o app Django
     models.py                        Project, Agent, Run, RunEvent, Approval
     views.py, forms.py, urls.py      telas
     tasks.py                         tarefas do Celery: executar uma execução, limpar worktrees
@@ -86,6 +86,6 @@ static/                              CSS de entrada e JavaScript de terceiros
 ## Testes e manutenção
 
 ```bash
-uv run python manage.py test izzyone_agent_control    # precisa do Postgres no ar
+uv run python manage.py test                          # precisa do Postgres no ar
 uv run python manage.py cleanup_workspaces --days 7   # apaga worktrees de execuções antigas
 ```

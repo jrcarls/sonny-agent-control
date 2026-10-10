@@ -621,7 +621,7 @@ wheels = [
 [[package]]
 name = "izzyone-agent-control"
 version = "0.1.0"
-source = { editable = "." }
+source = { virtual = "." }
 dependencies = [
     { name = "celery", extra = ["redis"] },
     { name = "django" },
