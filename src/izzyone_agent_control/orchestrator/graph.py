@@ -1,9 +1,19 @@
+"""Grafo de uma execução: o agente escolhido trabalha e pode delegar tarefas a outros agentes.
+
+Só um agente trabalha por vez. Quem delega fica esperando numa pilha (`frames`) até o outro
+terminar; a resposta volta para ele como resultado da ferramenta de delegação.
+"""
+
+import json
+from typing import TypedDict
+
 from langchain.chat_models import init_chat_model
-from langchain_core.messages import SystemMessage, ToolMessage
-from langgraph.graph import END, START, MessagesState, StateGraph
+from langchain_core.messages import HumanMessage, SystemMessage, ToolMessage
+from langchain_core.tools import tool
+from langgraph.graph import END, START, StateGraph
 from langgraph.types import interrupt
 
-from .models import Agent
+from .models import Agent, RunEvent
 from .tools import TOOL_SPECS, build_tools
 
 # Nome do provedor no cadastro do agente -> nome esperado pelo init_chat_model
@@ -14,10 +24,23 @@ MODEL_PROVIDERS = {
     Agent.Provider.OLLAMA: "ollama",
 }
 
+DELEGATE_TOOL = "delegate_task"
 
-class State(MessagesState):
-    # id da chamada de ferramenta -> True/False, preenchido pelo nó de aprovação
-    decisions: dict
+
+class Frame(TypedDict):
+    """Um agente em atividade: o do topo da pilha trabalha, os de baixo esperam por ele."""
+
+    agent_id: int
+    messages: list
+    call_id: str | None  # chamada de delegação, na conversa de quem delegou, que espera esta resposta
+    queue: list  # delegações pedidas por este agente que ainda não começaram
+
+
+class State(TypedDict, total=False):
+    frames: list[Frame]
+    memory: dict  # id do agente (str) -> conversa dele nesta execução, retomada se for chamado de novo
+    decisions: dict  # id da chamada de ferramenta -> True/False, preenchido pelo nó de aprovação
+    log: list  # eventos do passo atual, gravados pela tarefa como RunEvent
 
 
 def build_chat_model(agent):
@@ -25,67 +48,190 @@ def build_chat_model(agent):
     return init_chat_model(agent.model, model_provider=MODEL_PROVIDERS[agent.provider])
 
 
-def system_prompt(run):
+def initial_state(run):
+    frame = Frame(agent_id=run.agent_id, messages=[HumanMessage(run.prompt)], call_id=None, queue=[])
+    return {"frames": [frame], "memory": {}, "decisions": {}}
+
+
+def _load_agents(lead):
+    """Agentes que podem participar: o escolhido e todos os alcançáveis por delegação (só os ativos)."""
+    agents, delegates, pending = {lead.pk: lead}, {}, [lead]
+    while pending:
+        agent = pending.pop()
+        delegates[agent.pk] = list(agent.delegates.filter(is_active=True).exclude(pk=agent.pk))
+        for other in delegates[agent.pk]:
+            if other.pk not in agents:
+                agents[other.pk] = other
+                pending.append(other)
+    return agents, delegates
+
+
+def _delegate_tool(delegates):
+    team = "\n".join(f"- {agent.name}: {agent.description or 'sem descrição'}" for agent in delegates)
+
+    @tool(DELEGATE_TOOL, description=f"Passa uma tarefa a outro agente e espera a resposta dele.\nAgentes:\n{team}")
+    def delegate_task(agent: str, task: str) -> str:
+        raise NotImplementedError  # nunca é chamada: a delegação é tratada pelo grafo
+
+    return delegate_task
+
+
+def _system_prompt(run, agent, delegates, caller):
     project = run.project
-    context = (
+    parts = [
+        agent.system_prompt,
         f"Projeto: {project.name}\n"
         f"Repositório: {project.repo_url}\n"
         f"Você trabalha em uma cópia isolada do repositório, na branch {run.branch}, "
         f"criada a partir de {project.default_branch}. "
-        "Os caminhos das ferramentas são relativos à raiz do repositório."
-    )
-    return "\n\n".join(part for part in [run.agent.system_prompt, context] if part)
+        "Os caminhos das ferramentas são relativos à raiz do repositório.",
+    ]
+    if delegates:
+        parts.append(
+            f"Você pode delegar partes do trabalho com a ferramenta {DELEGATE_TOOL}; "
+            "o outro agente trabalha no mesmo repositório e você recebe a resposta dele."
+        )
+    if caller:
+        parts.append(f"Você foi chamado pelo agente {caller.name}. Sua resposta final é entregue a ele.")
+    return "\n\n".join(part for part in parts if part)
+
+
+def _copy(frames):
+    return [{**frame, "messages": list(frame["messages"]), "queue": list(frame["queue"])} for frame in frames]
+
+
+def _entry(kind, agent, content):
+    return {"kind": kind, "agent_id": agent.pk, "content": content}
 
 
 def build_graph(run, workspace, checkpointer):
-    """Laço do agente: o modelo responde ou pede ferramentas; as sensíveis esperam aprovação humana."""
-    tools = {item.name: item for item in build_tools(run, workspace)}
-    model = build_chat_model(run.agent)
-    if tools:
-        model = model.bind_tools(list(tools.values()))
-    system = SystemMessage(system_prompt(run))
+    agents, delegates = _load_agents(run.agent)
+    toolsets = {pk: {item.name: item for item in build_tools(run, workspace, agent)} for pk, agent in agents.items()}
+    models = {}
 
-    def _needs_approval(call):
+    def model_for(agent):
+        if agent.pk not in models:
+            bound = list(toolsets[agent.pk].values())
+            if delegates[agent.pk]:
+                bound.append(_delegate_tool(delegates[agent.pk]))
+            model = build_chat_model(agent)
+            models[agent.pk] = model.bind_tools(bound) if bound else model
+        return models[agent.pk]
+
+    def needs_approval(agent_id, call):
         # Ferramenta que o agente não tem habilitada é recusada direto, sem incomodar ninguém
-        return call["name"] in tools and TOOL_SPECS[call["name"]].requires_approval
+        return call["name"] in toolsets[agent_id] and TOOL_SPECS[call["name"]].requires_approval
 
-    def agent(state: State):
-        return {"messages": [model.invoke([system, *state["messages"]])]}
+    def work(state: State):
+        """O agente do topo da pilha dá um passo: responde ou pede ferramentas."""
+        frames = _copy(state["frames"])
+        frame = frames[-1]
+        agent = agents[frame["agent_id"]]
+        caller = agents[frames[-2]["agent_id"]] if len(frames) > 1 else None
+        system = SystemMessage(_system_prompt(run, agent, delegates[agent.pk], caller))
+        response = model_for(agent).invoke([system, *frame["messages"]])
+        frame["messages"].append(response)
 
-    def route(state: State):
-        calls = state["messages"][-1].tool_calls
+        log = []
+        if response.text:
+            log.append(_entry(RunEvent.Kind.MESSAGE, agent, str(response.text)))
+        for call in response.tool_calls:
+            if call["name"] != DELEGATE_TOOL:
+                arguments = json.dumps(call["args"], ensure_ascii=False, indent=2)
+                log.append(_entry(RunEvent.Kind.TOOL_CALL, agent, f"{call['name']}\n{arguments}"))
+        return {"frames": frames, "log": log}
+
+    def after_work(state: State):
+        frames = state["frames"]
+        calls = frames[-1]["messages"][-1].tool_calls
         if not calls:
-            return END
-        return "approval" if any(_needs_approval(call) for call in calls) else "tools"
+            return "handoff" if len(frames) > 1 else END
+        agent_id = frames[-1]["agent_id"]
+        return "approval" if any(needs_approval(agent_id, call) for call in calls) else "tools"
 
     def approval(state: State):
         # Este nó só pausa o grafo. Ao retomar ele roda de novo do início, por isso não tem efeito colateral.
-        calls = [call for call in state["messages"][-1].tool_calls if _needs_approval(call)]
-        decisions = interrupt([{"id": call["id"], "name": call["name"], "args": call["args"]} for call in calls])
-        return {"decisions": decisions}
+        frame = state["frames"][-1]
+        agent_id = frame["agent_id"]
+        requested = [
+            {"id": call["id"], "name": call["name"], "args": call["args"], "agent_id": agent_id}
+            for call in frame["messages"][-1].tool_calls
+            if needs_approval(agent_id, call)
+        ]
+        return {"decisions": interrupt(requested), "log": []}
 
     def run_tools(state: State):
+        """Executa as ferramentas pedidas pelo agente do topo e põe as delegações na fila dele."""
         decisions = state.get("decisions") or {}
-        messages = []
-        for call in state["messages"][-1].tool_calls:
-            if call["name"] not in tools:
-                content, status = f"Ferramenta indisponível: {call['name']}", "error"
-            elif _needs_approval(call) and not decisions.get(call["id"]):
+        frames = _copy(state["frames"])
+        frame = frames[-1]
+        agent = agents[frame["agent_id"]]
+        tools = toolsets[agent.pk]
+        team = {other.name: other for other in delegates[agent.pk]}
+        waiting = {item["agent_id"] for item in frames}
+        log = []
+
+        for call in frame["messages"][-1].tool_calls:
+            name, args = call["name"], call["args"]
+            if name == DELEGATE_TOOL and team:
+                target = team.get(args.get("agent"))
+                if target is None:
+                    content, status = f"Agente indisponível: {args.get('agent')}. Opções: {', '.join(team)}.", "error"
+                elif target.pk in waiting:
+                    content, status = f"{target.name} está esperando esta tarefa terminar e não pode recebê-la.", "error"
+                else:
+                    frame["queue"].append({"id": call["id"], "agent_id": target.pk, "task": str(args.get("task", ""))})
+                    continue
+            elif name not in tools:
+                content, status = f"Ferramenta indisponível: {name}", "error"
+            elif needs_approval(agent.pk, call) and not decisions.get(call["id"]):
                 content, status = "Ação negada pelo usuário.", "error"
             else:
                 try:
-                    content, status = str(tools[call["name"]].invoke(call["args"])), "success"
+                    content, status = str(tools[name].invoke(args)), "success"
                 except Exception as exc:  # o erro volta para o agente decidir o que fazer
                     content, status = f"Erro: {exc}", "error"
-            messages.append(ToolMessage(content=content, tool_call_id=call["id"], name=call["name"], status=status))
-        return {"messages": messages, "decisions": {}}
+            frame["messages"].append(ToolMessage(content=content, tool_call_id=call["id"], name=name, status=status))
+            log.append(_entry(RunEvent.Kind.TOOL_RESULT, agent, content))
+        return {"frames": frames, "decisions": {}, "log": log}
+
+    def delegate(state: State):
+        """Começa a próxima delegação da fila: o agente chamado vai para o topo da pilha."""
+        frames = _copy(state["frames"])
+        frame = frames[-1]
+        item = frame["queue"].pop(0)
+        caller, target = agents[frame["agent_id"]], agents[item["agent_id"]]
+        history = (state.get("memory") or {}).get(str(target.pk), [])
+        task = HumanMessage(f"Tarefa recebida de {caller.name}:\n{item['task']}")
+        frames.append(Frame(agent_id=target.pk, messages=[*history, task], call_id=item["id"], queue=[]))
+        log = [_entry(RunEvent.Kind.DELEGATION, caller, f"{caller.name} pediu a {target.name}:\n{item['task']}")]
+        return {"frames": frames, "log": log}
+
+    def handoff(state: State):
+        """O agente do topo terminou: sai da pilha e a resposta dele vai para quem delegou."""
+        frames = _copy(state["frames"])
+        done = frames.pop()
+        frame = frames[-1]
+        agent, caller = agents[done["agent_id"]], agents[frame["agent_id"]]
+        answer = str(done["messages"][-1].text) or "(sem resposta)"
+        frame["messages"].append(ToolMessage(content=answer, tool_call_id=done["call_id"], name=DELEGATE_TOOL))
+        memory = {**(state.get("memory") or {}), str(agent.pk): done["messages"]}
+        log = [_entry(RunEvent.Kind.DELEGATION, agent, f"{agent.name} entregou a resposta a {caller.name}.")]
+        return {"frames": frames, "memory": memory, "log": log}
+
+    def next_step(state: State):
+        return "delegate" if state["frames"][-1]["queue"] else "work"
 
     builder = StateGraph(State)
-    builder.add_node("agent", agent)
+    builder.add_node("work", work)
     builder.add_node("approval", approval)
     builder.add_node("tools", run_tools)
-    builder.add_edge(START, "agent")
-    builder.add_conditional_edges("agent", route, ["approval", "tools", END])
+    builder.add_node("delegate", delegate)
+    builder.add_node("handoff", handoff)
+    builder.add_edge(START, "work")
+    builder.add_conditional_edges("work", after_work, ["approval", "tools", "handoff", END])
     builder.add_edge("approval", "tools")
-    builder.add_edge("tools", "agent")
+    builder.add_conditional_edges("tools", next_step, ["delegate", "work"])
+    builder.add_conditional_edges("handoff", next_step, ["delegate", "work"])
+    builder.add_edge("delegate", "work")
     return builder.compile(checkpointer=checkpointer)

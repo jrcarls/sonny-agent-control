@@ -25,10 +25,10 @@
 
     <h2 class="mb-3 text-lg font-semibold text-heading">Andamento</h2>
     <ol class="space-y-3">
-        {% for event in run.events.all %}
-            <li class="rounded-base border p-4 text-sm {% if event.kind == "error" %}border-danger-subtle bg-danger-soft text-fg-danger-strong{% else %}border-default bg-neutral-primary-soft text-body{% endif %}">
+        {% for event in events %}
+            <li class="rounded-base border p-4 text-sm {% if event.kind == "error" %}border-danger-subtle bg-danger-soft text-fg-danger-strong{% elif event.kind == "delegation" %}border-brand-subtle bg-brand-softer text-body{% else %}border-default bg-neutral-primary-soft text-body{% endif %}">
                 <div class="mb-1 flex items-center justify-between text-xs">
-                    <span class="font-medium">{{ event.get_kind_display }}</span>
+                    <span class="font-medium">{% if event.agent %}{{ event.agent.name }} · {% endif %}{{ event.get_kind_display }}</span>
                     <time datetime="{{ event.created_at|date:"c" }}">{{ event.created_at|date:"H:i:s" }}</time>
                 </div>
                 <p class="whitespace-pre-wrap {% if event.kind != "error" %}text-heading{% endif %} {% if event.kind == "tool_call" or event.kind == "tool_result" %}max-h-64 overflow-auto font-mono text-xs{% endif %}">{{ event.content }}</p>

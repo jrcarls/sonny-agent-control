@@ -40,6 +40,9 @@ class Agent(models.Model):
     system_prompt = models.TextField("instruções", blank=True)
     # Nomes das ferramentas habilitadas (chaves de tools.TOOL_SPECS)
     tools = models.JSONField("ferramentas", default=list, blank=True)
+    delegates = models.ManyToManyField(
+        "self", verbose_name="pode delegar para", symmetrical=False, blank=True, related_name="delegated_by"
+    )
     is_active = models.BooleanField("ativo", default=True)
     created_at = models.DateTimeField("criado em", auto_now_add=True)
     updated_at = models.DateTimeField("atualizado em", auto_now=True)
@@ -106,9 +109,12 @@ class RunEvent(models.Model):
         MESSAGE = "message", "Mensagem"
         TOOL_CALL = "tool_call", "Ferramenta"
         TOOL_RESULT = "tool_result", "Resultado da ferramenta"
+        DELEGATION = "delegation", "Delegação"
         ERROR = "error", "Erro"
 
     run = models.ForeignKey(Run, on_delete=models.CASCADE, related_name="events")
+    # Agente que gerou o evento; vazio nos eventos da própria execução (fila, conclusão, erro)
+    agent = models.ForeignKey(Agent, on_delete=models.PROTECT, null=True, blank=True, related_name="events")
     kind = models.CharField("tipo", max_length=20, choices=Kind)
     content = models.TextField("conteúdo")
     created_at = models.DateTimeField("criado em", auto_now_add=True)
@@ -131,6 +137,9 @@ class Approval(models.Model):
         REJECTED = "rejected", "Negada"
 
     run = models.ForeignKey(Run, verbose_name="execução", on_delete=models.CASCADE, related_name="approvals")
+    agent = models.ForeignKey(
+        Agent, verbose_name="pedido por", on_delete=models.PROTECT, null=True, blank=True, related_name="approvals"
+    )
     tool_call_id = models.CharField(max_length=255)
     tool_name = models.CharField("ferramenta", max_length=100)
     tool_args = models.JSONField("argumentos", default=dict)

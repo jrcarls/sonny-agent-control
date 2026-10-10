@@ -65,8 +65,8 @@ def _github_repo(repo_url):
     raise ToolError("Só é possível abrir pull request em repositórios do GitHub.")
 
 
-def build_tools(run, workspace):
-    """Ferramentas habilitadas para o agente da execução, presas ao worktree dela."""
+def build_tools(run, workspace, agent):
+    """Ferramentas habilitadas para um agente, presas ao worktree da execução."""
 
     @tool
     def list_files(path: str = ".") -> str:
@@ -168,4 +168,4 @@ def build_tools(run, workspace):
         return f"Pull request aberto: {run.pull_request_url}"
 
     available = [list_files, read_file, search_files, write_file, run_command, open_pull_request]
-    return [item for item in available if item.name in run.agent.tools]
+    return [item for item in available if item.name in agent.tools]

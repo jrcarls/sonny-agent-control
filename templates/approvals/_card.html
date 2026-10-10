@@ -12,7 +12,7 @@
     </div>
     <p class="mb-3 text-sm text-body">
         <a href="{{ approval.run.get_absolute_url }}" class="font-medium text-fg-brand hover:underline">{{ approval.run }}</a>
-        · {{ approval.run.agent.name }} em {{ approval.run.project.name }} · {{ approval.created_at|date:"d/m/Y H:i" }}
+        · {% firstof approval.agent.name approval.run.agent.name %} em {{ approval.run.project.name }} · {{ approval.created_at|date:"d/m/Y H:i" }}
     </p>
     <dl class="space-y-2 text-sm">
         {% for name, value in approval.tool_args.items %}

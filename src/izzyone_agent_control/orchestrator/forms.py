@@ -26,18 +26,33 @@ class AgentForm(forms.ModelForm):
         initial=DEFAULT_TOOLS,
         help_text="Sem ferramentas, o agente só responde em texto.",
     )
+    delegates = forms.ModelMultipleChoiceField(
+        label="Pode delegar para",
+        queryset=Agent.objects.none(),
+        required=False,
+        widget=forms.CheckboxSelectMultiple,
+        help_text="Este agente pode passar tarefas a esses agentes e esperar a resposta deles.",
+    )
 
     class Meta:
         model = Agent
-        fields = ["name", "description", "provider", "model", "system_prompt", "tools", "is_active"]
+        fields = ["name", "description", "provider", "model", "system_prompt", "tools", "delegates", "is_active"]
         widgets = {
             "description": forms.TextInput(attrs={"placeholder": "Ex.: revisa pull requests"}),
             "system_prompt": forms.Textarea(attrs={"rows": 8}),
         }
         help_texts = {
+            "description": "Os outros agentes leem isto para decidir o que delegar a ele.",
             "model": "Identificador do modelo no provedor escolhido.",
             "is_active": "Agentes inativos não podem receber novas tarefas.",
         }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        # Um agente não delega para si mesmo
+        self.fields["delegates"].queryset = Agent.objects.exclude(pk=self.instance.pk)
+        if not self.fields["delegates"].queryset.exists():
+            del self.fields["delegates"]
 
 
 class RunForm(forms.ModelForm):

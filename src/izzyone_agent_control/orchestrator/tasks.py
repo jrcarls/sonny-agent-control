@@ -1,15 +1,13 @@
-import json
 from contextlib import contextmanager
 
 from celery import shared_task
 from django.db import connection
 from django.utils import timezone
-from langchain_core.messages import AIMessage, HumanMessage, ToolMessage
 from langgraph.checkpoint.postgres import PostgresSaver
 from langgraph.types import Command
 from psycopg.conninfo import make_conninfo
 
-from .graph import build_graph
+from .graph import build_graph, initial_state
 from .models import Approval, Run, RunEvent
 from .workspace import prepare_workspace, workspace_path
 
@@ -30,19 +28,13 @@ def open_checkpointer():
         yield checkpointer
 
 
-def _record_messages(run, update):
-    """Transforma as mensagens de um passo do grafo em eventos; devolve o último texto do agente."""
+def _record_log(run, update):
+    """Grava os eventos de um passo do grafo; devolve a última mensagem do agente principal, se houver."""
     text = ""
-    for message in (update or {}).get("messages", []):
-        if isinstance(message, AIMessage):
-            if message.text:
-                text = str(message.text)
-                run.events.create(kind=RunEvent.Kind.MESSAGE, content=text)
-            for call in message.tool_calls:
-                arguments = json.dumps(call["args"], ensure_ascii=False, indent=2)
-                run.events.create(kind=RunEvent.Kind.TOOL_CALL, content=f"{call['name']}\n{arguments}")
-        elif isinstance(message, ToolMessage):
-            run.events.create(kind=RunEvent.Kind.TOOL_RESULT, content=str(message.content)[:MAX_EVENT_LENGTH])
+    for entry in (update or {}).get("log", []):
+        run.events.create(kind=entry["kind"], agent_id=entry["agent_id"], content=entry["content"][:MAX_EVENT_LENGTH])
+        if entry["kind"] == RunEvent.Kind.MESSAGE and entry["agent_id"] == run.agent_id:
+            text = entry["content"]
     return text
 
 
@@ -55,7 +47,7 @@ def _graph_input(run, snapshot):
     if snapshot.next:
         return None  # parou no meio (ex.: worker reiniciado): continua do último passo salvo
     run.events.create(kind=RunEvent.Kind.STATUS, content=f"Agente {run.agent.name} começou a trabalhar.")
-    return {"messages": [HumanMessage(run.prompt)]}
+    return initial_state(run)
 
 
 @shared_task
@@ -85,7 +77,7 @@ def execute_run(run_id):
                     if node == "__interrupt__":
                         requested = node_update[0].value
                     else:
-                        result = _record_messages(run, node_update) or result
+                        result = _record_log(run, node_update) or result
     except Exception as exc:
         run.events.create(kind=RunEvent.Kind.ERROR, content=f"{type(exc).__name__}: {exc}")
         run.status = Run.Status.FAILED
@@ -94,7 +86,8 @@ def execute_run(run_id):
         if requested:
             for item in requested:
                 run.approvals.get_or_create(
-                    tool_call_id=item["id"], defaults={"tool_name": item["name"], "tool_args": item["args"]}
+                    tool_call_id=item["id"],
+                    defaults={"tool_name": item["name"], "tool_args": item["args"], "agent_id": item["agent_id"]},
                 )
             run.status = Run.Status.WAITING
             run.events.create(kind=RunEvent.Kind.STATUS, content="Aguardando aprovação para continuar.")

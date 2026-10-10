@@ -130,8 +130,9 @@ class RunDetailView(LoginRequiredMixin, DetailView):
     context_object_name = "run"
 
     def get_context_data(self, **kwargs):
-        pending = self.object.approvals.filter(status=Approval.Status.PENDING)
-        return super().get_context_data(**kwargs, pending_approvals=pending)
+        pending = self.object.approvals.filter(status=Approval.Status.PENDING).select_related("agent")
+        events = self.object.events.select_related("agent")
+        return super().get_context_data(**kwargs, pending_approvals=pending, events=events)
 
     def get_template_names(self):
         # A tela consulta este mesmo endereço via htmx enquanto a execução está ativa
@@ -144,7 +145,7 @@ class ApprovalListView(LoginRequiredMixin, ListView):
     paginate_by = 25
 
     def get_queryset(self):
-        queryset = Approval.objects.select_related("run__project", "run__agent", "decided_by")
+        queryset = Approval.objects.select_related("run__project", "run__agent", "agent", "decided_by")
         if self.request.GET.get("situacao") == "historico":
             return queryset.exclude(status=Approval.Status.PENDING)
         return queryset.filter(status=Approval.Status.PENDING)
