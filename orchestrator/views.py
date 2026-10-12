@@ -430,10 +430,12 @@ def get_service(value):
 
 
 def agents_per_service():
-    """Serviço -> agentes ativos que dependem da chave dele (no GitHub, os que podem abrir pull request)."""
+    """Serviço -> agentes ativos que dependem da chave dele (no GitHub, os que abrem ou comentam pull requests)."""
     active = Agent.objects.filter(is_active=True)
     usage = dict(active.values_list("provider").annotate(Count("pk")))
-    usage[Service.GITHUB] = active.filter(tools__contains=["open_pull_request"]).count()
+    usage[Service.GITHUB] = active.filter(
+        Q(tools__contains=["open_pull_request"]) | Q(tools__contains=["comment_pull_request"])
+    ).count()
     return usage
 
 

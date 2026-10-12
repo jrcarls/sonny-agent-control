@@ -129,7 +129,11 @@ precisar da chave SSH. Sem token, o agente envia a branch e entrega o link para 
   vez e marcadas em vários agentes, entram nas instruções deles em toda execução.
 - **Execução**: uma tarefa dada a um agente em um projeto. Roda no worker, em um worktree próprio
   (`.workspaces/runs/<id>`, branch `sonny/run-<id>`), com o estado salvo no Postgres a cada passo.
-- **Aprovação**: rodar comando e abrir pull request pausam a execução até alguém aprovar ou negar.
+- **Aprovação**: rodar comando, abrir pull request e comentar em pull request pausam a execução até alguém
+  aprovar ou negar.
+- **Pull requests**: o agente lê a descrição, as verificações, as revisões, os comentários e o diff de um
+  pull request, e responde com um comentário. Esse texto vem de outras pessoas e pode tentar dar ordens ao
+  agente; em repositório público, prefira agentes sem ferramentas de ação para essa leitura.
 - **Comando de teste**: cadastrado no projeto (por exemplo `ruff check . && pytest -q`). O agente o roda
   pela ferramenta Rodar testes sem pedir aprovação, porque não é ele quem escolhe o comando.
 - **Ambiente dos comandos**: o que o agente roda (comando ou testes) recebe só as variáveis básicas do

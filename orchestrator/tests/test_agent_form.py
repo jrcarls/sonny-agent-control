@@ -65,13 +65,14 @@ class AgentFormLayoutTests(AgentFormTestCase):
                         "Ver diff",
                         "Ver histórico",
                         "Listar pull requests",
+                        "Ler pull request",
                     ],
                 ),
                 ("Escrita", ["Escrever arquivo", "Editar arquivo"]),
-                ("Ações sensíveis", ["Rodar comando", "Rodar testes", "Abrir pull request"]),
+                ("Ações sensíveis", ["Rodar comando", "Rodar testes", "Abrir pull request", "Comentar no pull request"]),
             ],
         )
-        self.assertContains(page, "pede aprovação", count=2)
+        self.assertContains(page, "pede aprovação", count=3)
         self.assertContains(page, "Executa comandos de shell no worktree.")
 
     def test_delegates_show_the_role_of_each_agent(self):

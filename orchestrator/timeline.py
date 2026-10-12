@@ -19,11 +19,13 @@ SUMMARIES = {
     "git_diff": ("Viu o diff", "revision"),
     "git_log": ("Viu o histórico", "path"),
     "list_pull_requests": ("Listou pull requests", "state"),
+    "read_pull_request": ("Leu o pull request", "number"),
     "write_file": ("Escreveu", "path"),
     "edit_file": ("Editou", "path"),
     "run_command": ("Rodou", "command"),
     "run_tests": ("Rodou os testes", ""),
     "open_pull_request": ("Abriu pull request", "title"),
+    "comment_pull_request": ("Comentou no pull request", "body"),
 }
 # Começo do resultado quando a ferramenta não fez o que foi pedido
 FAILURES = ("Erro:", "Ação negada", "Ferramenta indisponível")
