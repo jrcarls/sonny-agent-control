@@ -52,6 +52,9 @@ class TimelineTests(RunTestCase):
         self.assertEqual(self.timeline()[0].label, "Em andamento")
         self.run_.status = Run.Status.WAITING
         self.assertEqual(self.timeline()[0].label, "Aguardando aprovação")
+        question = self.add(Kind.TOOL_CALL, 'ask_user\n{"question": "Qual banco?\\nPostgres ou SQLite?"}')
+        asked = self.timeline()[1]
+        self.assertEqual((asked.key, asked.verb, asked.target, asked.label), (question.pk, "Perguntou", "Qual banco?", "Aguardando resposta"))
         self.run_.status = Run.Status.CANCELED
         self.assertEqual((self.timeline()[0].state, self.timeline()[0].label), ("skipped", "Não executada"))
 

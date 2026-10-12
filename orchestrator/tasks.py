@@ -14,6 +14,7 @@ from psycopg.conninfo import make_conninfo
 
 from .graph import USAGE, build_graph, follow_up_state, initial_state
 from .models import Approval, Run, RunEvent, Schedule
+from .tools import ASK_TOOL
 from .workspace import prepare_workspace, remove_workspace, workspace_path, workspaces_root
 
 # Tamanho máximo, em caracteres, do texto guardado em cada evento do andamento
@@ -65,7 +66,13 @@ def _graph_input(run, snapshot):
     if snapshot.interrupts:
         requested = [item["id"] for item in snapshot.interrupts[0].value]
         approvals = run.approvals.filter(tool_call_id__in=requested)
-        return Command(resume={item.tool_call_id: item.status == Approval.Status.APPROVED for item in approvals})
+        # Aprovação volta como sim ou não; pergunta ao usuário volta com o texto da resposta (vazio se ele não quis)
+        return Command(
+            resume={
+                item.tool_call_id: item.answer if item.is_question else item.status == Approval.Status.APPROVED
+                for item in approvals
+            }
+        )
     if snapshot.next:
         return None  # parou no meio (falha ou worker reiniciado): continua do último passo salvo
     if run.follow_up and snapshot.values.get("frames"):
@@ -163,7 +170,9 @@ def execute_run(self, run_id):
                     defaults={"tool_name": item["name"], "tool_args": item["args"], "agent_id": item["agent_id"]},
                 )
             run.status = Run.Status.WAITING
-            run.events.create(kind=RunEvent.Kind.STATUS, content="Aguardando aprovação para continuar.")
+            only_questions = all(item["name"] == ASK_TOOL for item in requested)
+            waiting_for = "a sua resposta" if only_questions else "aprovação"
+            run.events.create(kind=RunEvent.Kind.STATUS, content=f"Aguardando {waiting_for} para continuar.")
         else:
             run.result = result
             run.status = Run.Status.SUCCEEDED

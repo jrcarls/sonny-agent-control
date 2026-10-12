@@ -789,25 +789,33 @@ class ApprovalListView(LoginRequiredMixin, ListView):
 
 
 class ApprovalDecideView(LoginRequiredMixin, View):
-    """Aprova ou nega um pedido. Com o último pedido pendente decidido, a execução volta para a fila."""
+    """Aprova ou nega um pedido, ou responde a uma pergunta do agente.
+
+    Com o último pedido pendente decidido, a execução volta para a fila.
+    """
 
     def post(self, request, pk):
         approval = get_object_or_404(Approval.objects.select_related("run"), pk=pk)
         approved = request.POST.get("decision") == "approve"
         status = Approval.Status.APPROVED if approved else Approval.Status.REJECTED
+        answer = request.POST.get("answer", "").strip() if approval.is_question and approved else ""
+        if approval.is_question and approved and not answer:
+            messages.error(request, "Escreva a resposta antes de enviar.")
+            return redirect(approval.run)
         with transaction.atomic():
             # Trava a execução: decisões simultâneas de pedidos diferentes passam uma de cada vez,
             # senão cada uma veria a outra como pendente e a execução nunca voltaria para a fila
             run = Run.objects.select_for_update().get(pk=approval.run_id)
             # O filtro por pendente garante que dois cliques simultâneos não decidem duas vezes
             decided = Approval.objects.filter(pk=pk, status=Approval.Status.PENDING).update(
-                status=status, decided_by=request.user, decided_at=timezone.now()
+                status=status, answer=answer, decided_by=request.user, decided_at=timezone.now()
             )
             if decided:
-                verb = "aprovou" if approved else "negou"
-                run.events.create(
-                    kind=RunEvent.Kind.STATUS, content=f"{request.user.get_username()} {verb}: {approval.tool_label}."
-                )
+                if approval.is_question:
+                    action = "respondeu à pergunta do agente" if approved else "preferiu não responder à pergunta do agente"
+                else:
+                    action = f"{'aprovou' if approved else 'negou'}: {approval.tool_label}"
+                run.events.create(kind=RunEvent.Kind.STATUS, content=f"{request.user.get_username()} {action}.")
                 still_pending = run.approvals.filter(status=Approval.Status.PENDING).exists()
                 if not still_pending and Run.objects.filter(pk=run.pk, status=Run.Status.WAITING).update(
                     status=Run.Status.QUEUED

@@ -131,6 +131,9 @@ precisar da chave SSH. Sem token, o agente envia a branch e entrega o link para 
   (`.workspaces/runs/<id>`, branch `sonny/run-<id>`), com o estado salvo no Postgres a cada passo.
 - **Aprovação**: rodar comando, abrir pull request e comentar em pull request pausam a execução até alguém
   aprovar ou negar.
+- **Pergunta ao usuário**: o agente com essa ferramenta pode parar e perguntar quando a tarefa deixa uma
+  dúvida. A pergunta aparece na execução e em Aprovações, com um campo para responder. No modo autônomo
+  ele não para: é avisado de que não há ninguém e segue com a opção mais segura.
 - **Pull requests**: o agente lê a descrição, as verificações, as revisões, os comentários e o diff de um
   pull request, e responde com um comentário. Esse texto vem de outras pessoas e pode tentar dar ordens ao
   agente; em repositório público, prefira agentes sem ferramentas de ação para essa leitura.

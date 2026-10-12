@@ -15,12 +15,15 @@ from langgraph.types import interrupt
 
 from .models import RunEvent
 from .providers import MODEL_PROVIDERS, chat_model_options
-from .tools import TOOL_SPECS, build_tools
+from .tools import ASK_TOOL, TOOL_SPECS, build_tools
 
 DELEGATE_TOOL = "delegate_task"
 # Entrada do log que não vira evento: consumo de tokens de uma chamada ao modelo
 USAGE = "usage"
 
+
+# O que o agente recebe quando pergunta e ninguém responde
+NO_ANSWER = "Siga com a opção mais segura e diga na resposta final o que você supôs."
 
 # Quantas vezes o agente principal é chamado de novo quando o modelo devolve uma resposta vazia
 EMPTY_RESPONSE_RETRIES = 1
@@ -42,7 +45,9 @@ class Frame(TypedDict):
 class State(TypedDict, total=False):
     frames: list[Frame]
     memory: dict  # id do agente (str) -> conversa dele nesta execução, retomada se for chamado de novo
-    decisions: dict  # id da chamada de ferramenta -> True/False, preenchido pelo nó de aprovação
+    # id da chamada de ferramenta -> True/False (aprovação) ou o texto da resposta (pergunta ao usuário),
+    # preenchido pelo nó de aprovação
+    decisions: dict
     log: list  # eventos do passo atual, gravados pela tarefa como RunEvent
 
 
@@ -138,6 +143,12 @@ def build_graph(run, workspace, checkpointer):
             return False
         return call["name"] in toolsets[agent_id] and TOOL_SPECS[call["name"]].requires_approval
 
+    def waits_for_user(agent_id, call):
+        """A chamada pausa a execução: precisa de aprovação ou é uma pergunta para a pessoa."""
+        if needs_approval(agent_id, call):
+            return True
+        return call["name"] == ASK_TOOL and ASK_TOOL in toolsets[agent_id] and not run.autonomous
+
     def work(state: State):
         """O agente do topo da pilha dá um passo: responde ou pede ferramentas."""
         frames = _copy(state["frames"])
@@ -177,7 +188,7 @@ def build_graph(run, workspace, checkpointer):
         if not calls:
             return "handoff" if len(frames) > 1 else END
         agent_id = frames[-1]["agent_id"]
-        return "approval" if any(needs_approval(agent_id, call) for call in calls) else "tools"
+        return "approval" if any(waits_for_user(agent_id, call) for call in calls) else "tools"
 
     def approval(state: State):
         # Este nó só pausa o grafo. Ao retomar ele roda de novo do início, por isso não tem efeito colateral.
@@ -186,7 +197,7 @@ def build_graph(run, workspace, checkpointer):
         requested = [
             {"id": call["id"], "name": call["name"], "args": call["args"], "agent_id": agent_id}
             for call in frame["messages"][-1].tool_calls
-            if needs_approval(agent_id, call)
+            if waits_for_user(agent_id, call)
         ]
         return {"decisions": interrupt(requested), "log": []}
 
@@ -214,6 +225,15 @@ def build_graph(run, workspace, checkpointer):
                     continue
             elif name not in tools:
                 content, status = f"Ferramenta indisponível: {name}", "error"
+            elif name == ASK_TOOL:
+                answer = decisions.get(call["id"])
+                if run.autonomous:
+                    content = f"Modo autônomo: não há ninguém para responder. {NO_ANSWER}"
+                elif isinstance(answer, str) and answer.strip():
+                    content = f"Resposta do usuário:\n{answer.strip()}"
+                else:
+                    content = f"O usuário preferiu não responder. {NO_ANSWER}"
+                status = "success"
             elif needs_approval(agent.pk, call) and not decisions.get(call["id"]):
                 content, status = "Ação negada pelo usuário.", "error"
             else:

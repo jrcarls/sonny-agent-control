@@ -69,6 +69,7 @@ class AgentFormLayoutTests(AgentFormTestCase):
                     ],
                 ),
                 ("Escrita", ["Escrever arquivo", "Editar arquivo"]),
+                ("Interação", ["Perguntar ao usuário"]),
                 ("Ações sensíveis", ["Rodar comando", "Rodar testes", "Abrir pull request", "Comentar no pull request"]),
             ],
         )

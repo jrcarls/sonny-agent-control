@@ -9,8 +9,8 @@ from ..workspace import workspace_path
 from .base import FakeModel, RunTestCase, real_open_checkpointer, tool_call, use_model
 
 
-class ApprovalFlowTests(RunTestCase):
-    agent_tools = ["run_command"]
+class ApprovalFlow:
+    """Passos comuns aos testes de pedidos que pausam a execução: começar, decidir pela tela e retomar."""
 
     def start(self, *responses):
         run = self.make_run()
@@ -20,10 +20,10 @@ class ApprovalFlowTests(RunTestCase):
         run.refresh_from_db()
         return run
 
-    def decide(self, approval, decision):
+    def decide(self, approval, decision, **data):
         with mock.patch.object(tasks.execute_run, "delay") as delay, self.captureOnCommitCallbacks(execute=True):
             response = self.client.post(
-                reverse("orchestrator:approval_decide", args=[approval.pk]), {"decision": decision}, follow=True
+                reverse("orchestrator:approval_decide", args=[approval.pk]), {"decision": decision, **data}, follow=True
             )
         return response, delay
 
@@ -31,6 +31,10 @@ class ApprovalFlowTests(RunTestCase):
         with use_model(self.model):
             tasks.execute_run(run.pk)
         run.refresh_from_db()
+
+
+class ApprovalFlowTests(ApprovalFlow, RunTestCase):
+    agent_tools = ["run_command"]
 
     def test_sensitive_tool_waits_for_approval_before_running(self):
         run = self.start(tool_call("run_command", command="touch feito.txt"), AIMessage(content="Pronto."))
@@ -108,6 +112,92 @@ class ApprovalFlowTests(RunTestCase):
         self.decide(run.approvals.get(), "approve")
         self.assertContains(self.client.get(url), "Nenhum pedido pendente")
         self.assertContains(self.client.get(url, {"situacao": "historico"}), "Aprovada")
+
+
+class AskUserTests(ApprovalFlow, RunTestCase):
+    agent_tools = ["ask_user", "run_command"]
+    question = "Qual banco devo usar: Postgres ou SQLite?"
+
+    def ask(self):
+        return self.start(tool_call("ask_user", question=self.question), AIMessage(content="Usei Postgres."))
+
+    def test_question_pauses_the_run_and_is_shown_with_a_field_to_answer(self):
+        run = self.ask()
+        self.assertEqual(run.status, Run.Status.WAITING)
+        approval = run.approvals.get()
+        self.assertEqual((approval.tool_name, approval.tool_args), ("ask_user", {"question": self.question}))
+        self.assertTrue(run.events.filter(content="Aguardando a sua resposta para continuar.").exists())
+        for url in (run.get_absolute_url(), reverse("orchestrator:approval_list")):
+            page = self.client.get(url)
+            self.assertContains(page, self.question)
+            self.assertContains(page, 'name="answer"')
+            self.assertContains(page, ">Responder<")
+
+    def test_answer_goes_back_to_the_agent(self):
+        run = self.ask()
+        response, delay = self.decide(run.approvals.get(), "approve", answer="  Postgres.  ")
+        delay.assert_called_once_with(run.pk)
+        approval = run.approvals.get()
+        self.assertEqual((approval.status, approval.answer, approval.decided_by), ("approved", "Postgres.", self.user))
+        self.assertContains(response, "respondeu à pergunta do agente")
+
+        self.resume(run)
+        self.assertEqual((run.status, run.result), (Run.Status.SUCCEEDED, "Usei Postgres."))
+        self.assertEqual(self.model.calls[1][-1].content, "Resposta do usuário:\nPostgres.")
+        self.assertEqual(len(self.model.calls), 2)
+        history = self.client.get(reverse("orchestrator:approval_list"), {"situacao": "historico"})
+        self.assertContains(history, "Respondida")
+        self.assertContains(history, "Postgres.")
+
+    def test_empty_answer_is_refused_and_the_question_stays_pending(self):
+        run = self.ask()
+        response, delay = self.decide(run.approvals.get(), "approve", answer="   ")
+        delay.assert_not_called()
+        self.assertContains(response, "Escreva a resposta")
+        self.assertEqual(run.approvals.get().status, Approval.Status.PENDING)
+
+    def test_declining_to_answer_lets_the_agent_go_on(self):
+        run = self.ask()
+        self.decide(run.approvals.get(), "reject", answer="ignorado")
+        self.assertEqual(run.approvals.get().answer, "")
+        self.resume(run)
+        self.assertEqual(run.status, Run.Status.SUCCEEDED)
+        self.assertIn("preferiu não responder", self.model.calls[1][-1].content)
+        self.assertContains(self.client.get(reverse("orchestrator:approval_list"), {"situacao": "historico"}), "Sem resposta")
+
+    def test_question_and_command_in_the_same_step_wait_together(self):
+        both = AIMessage(
+            content="",
+            tool_calls=[
+                {"name": "ask_user", "args": {"question": self.question}, "id": "call_a"},
+                {"name": "run_command", "args": {"command": "touch b.txt"}, "id": "call_b"},
+            ],
+        )
+        run = self.start(both, AIMessage(content="Feito."))
+        self.assertTrue(run.events.filter(content="Aguardando aprovação para continuar.").exists())
+        question, command = run.approvals.order_by("tool_call_id")
+        self.decide(question, "approve", answer="SQLite")
+        _, delay = self.decide(command, "approve")
+        delay.assert_called_once_with(run.pk)
+        self.resume(run)
+        contents = [message.content for message in self.model.calls[1][-2:]]
+        self.assertEqual(contents[0], "Resposta do usuário:\nSQLite")
+        self.assertIn("código de saída: 0", contents[1])
+        self.assertTrue((workspace_path(run) / "b.txt").exists())
+
+    def test_autonomous_run_does_not_stop_to_ask(self):
+        run = self.make_run(autonomous=True)
+        model = self.execute(run, tool_call("ask_user", question=self.question), AIMessage(content="Supus Postgres."))
+        self.assertEqual((run.status, run.result), (Run.Status.SUCCEEDED, "Supus Postgres."))
+        self.assertIn("Modo autônomo: não há ninguém para responder", model.calls[1][-1].content)
+        self.assertFalse(run.approvals.exists())
+
+    def test_agent_without_the_tool_cannot_ask(self):
+        self.agent.tools = ["run_command"]
+        self.agent.save()
+        run = self.start(tool_call("ask_user", question=self.question), AIMessage(content="Ok."))
+        self.assertEqual(run.status, Run.Status.SUCCEEDED)
+        self.assertEqual(self.model.calls[1][-1].content, "Ferramenta indisponível: ask_user")
 
 
 class AutonomousRunTests(RunTestCase):

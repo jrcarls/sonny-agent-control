@@ -5,7 +5,7 @@ import re
 from dataclasses import dataclass
 
 from .models import Run, RunEvent
-from .tools import TOOL_SPECS
+from .tools import ASK_TOOL, TOOL_SPECS
 
 Kind = RunEvent.Kind
 
@@ -22,6 +22,7 @@ SUMMARIES = {
     "read_pull_request": ("Leu o pull request", "number"),
     "write_file": ("Escreveu", "path"),
     "edit_file": ("Editou", "path"),
+    "ask_user": ("Perguntou", "question"),
     "run_command": ("Rodou", "command"),
     "run_tests": ("Rodou os testes", ""),
     "open_pull_request": ("Abriu pull request", "title"),
@@ -44,6 +45,8 @@ class Item:
     # "pending" (sem resultado ainda), "ok", "warning" (comando com código de saída diferente de zero) ou "error"
     state: str = ""
     label: str = ""
+    # Pergunta ao usuário: enquanto pendente, espera uma resposta e não uma aprovação
+    question: bool = False
 
     @property
     def key(self):
@@ -70,7 +73,8 @@ def _tool_item(event):
     target = _argument(arguments, argument).splitlines()[0:1] if argument else []
     # Listar sem dizer a pasta é listar a raiz do repositório
     default = "." if name == "list_files" else ""
-    return Item(kind="tool", event=event, verb=verb, target=target[0] if target else default, state="pending")
+    target = target[0] if target else default
+    return Item(kind="tool", event=event, verb=verb, target=target, state="pending", question=name == ASK_TOOL)
 
 
 def _finish(item, result):
@@ -99,7 +103,7 @@ def build_timeline(run, events):
     for pending in waiting.values():
         for item in pending:
             if run.status == Run.Status.WAITING:
-                item.label = "Aguardando aprovação"
+                item.label = "Aguardando resposta" if item.question else "Aguardando aprovação"
             elif run.is_working:
                 item.label = "Em andamento"
             else:

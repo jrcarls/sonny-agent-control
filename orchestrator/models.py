@@ -8,7 +8,7 @@ from django.urls import reverse
 from django.utils import timezone
 
 from .crypto import API_KEYS, decrypt, encrypt, generate_ssh_keypair
-from .tools import TOOL_SPECS, github_repository
+from .tools import ASK_TOOL, TOOL_SPECS, github_repository
 
 
 class Project(models.Model):
@@ -344,7 +344,7 @@ class RunEvent(models.Model):
 
 
 class Approval(models.Model):
-    """Pedido de autorização para uma chamada de ferramenta sensível feita por um agente."""
+    """Pedido que pausa a execução até alguém decidir: autorizar uma ferramenta sensível ou responder a uma pergunta."""
 
     class Status(models.TextChoices):
         PENDING = "pending", "Pendente"
@@ -360,6 +360,8 @@ class Approval(models.Model):
     tool_name = models.CharField("ferramenta", max_length=100)
     tool_args = models.JSONField("argumentos", default=dict)
     status = models.CharField("situação", max_length=20, choices=Status, default=Status.PENDING)
+    # Só nas perguntas do agente (ask_user): o que a pessoa respondeu
+    answer = models.TextField("resposta", blank=True)
     decided_by = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         verbose_name="decidida por",
@@ -379,6 +381,10 @@ class Approval(models.Model):
 
     def __str__(self):
         return f"{self.tool_label} ({self.run})"
+
+    @property
+    def is_question(self):
+        return self.tool_name == ASK_TOOL
 
     @property
     def tool_label(self):

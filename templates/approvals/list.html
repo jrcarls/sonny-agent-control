@@ -18,7 +18,7 @@
         </div>
         {% if is_paginated %}<c-pagination :page_obj="page_obj" query="situacao={{ situacao }}" />{% endif %}
     {% else %}
-        <c-empty-state icon="checklist" title="{% if situacao == 'historico' %}Nenhuma decisão registrada{% else %}Nenhum pedido pendente{% endif %}">Quando um agente quiser rodar um comando ou abrir um pull request, o pedido aparece aqui.</c-empty-state>
+        <c-empty-state icon="checklist" title="{% if situacao == 'historico' %}Nenhuma decisão registrada{% else %}Nenhum pedido pendente{% endif %}">Quando um agente quiser rodar um comando, abrir um pull request ou fizer uma pergunta, o pedido aparece aqui.</c-empty-state>
     {% endif %}
 </div>
 {% endblock %}

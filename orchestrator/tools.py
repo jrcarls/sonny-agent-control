@@ -45,6 +45,11 @@ TOOL_SPECS = {
     ),
     "write_file": ToolSpec("Escrever arquivo", "Cria ou sobrescreve arquivos no worktree da execução.", "Escrita"),
     "edit_file": ToolSpec("Editar arquivo", "Troca um trecho de um arquivo sem regravar o resto.", "Escrita"),
+    "ask_user": ToolSpec(
+        "Perguntar ao usuário",
+        "Pausa a execução para fazer uma pergunta a você, quando a tarefa deixa uma dúvida que muda o resultado.",
+        "Interação",
+    ),
     "run_command": ToolSpec(
         "Rodar comando", "Executa comandos de shell no worktree.", "Ações sensíveis", requires_approval=True
     ),
@@ -67,6 +72,8 @@ TOOL_SPECS = {
     ),
 }
 
+# A pergunta não é respondida aqui: o grafo pausa a execução e a resposta da pessoa volta como resultado
+ASK_TOOL = "ask_user"
 DEFAULT_TOOLS = ["list_files", "read_file", "search_files"]
 # Situações aceitas por list_pull_requests e quantos pull requests ela traz, dos mais recentes
 PULL_REQUEST_STATES = {"open": "abertos", "closed": "fechados", "all": "todos"}
@@ -390,6 +397,15 @@ def build_tools(run, workspace, agent):
         file.write_text(content.replace(old_text, new_text), newline="")
         return f"{path} editado ({count} trecho{'s' if count > 1 else ''} substituído{'s' if count > 1 else ''})."
 
+    @tool
+    def ask_user(question: str) -> str:
+        """Faz uma pergunta à pessoa que pediu a tarefa e espera a resposta. A execução fica parada até lá.
+
+        Use só quando a dúvida muda o que você vai fazer e não dá para resolver lendo o repositório. Faça uma
+        pergunta completa, que se entenda sem o resto da conversa, e ofereça as opções quando houver.
+        """
+        raise NotImplementedError  # nunca é chamada: a pergunta é tratada pelo grafo
+
     def shell(command, timeout):
         try:
             process = subprocess.run(
@@ -495,6 +511,7 @@ def build_tools(run, workspace, agent):
         read_pull_request,
         write_file,
         edit_file,
+        ask_user,
         run_command,
         run_tests,
         open_pull_request,
