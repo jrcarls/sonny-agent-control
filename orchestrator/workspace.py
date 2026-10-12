@@ -5,6 +5,7 @@ import os
 import shlex
 import shutil
 import subprocess
+import tempfile
 from contextlib import contextmanager
 from pathlib import Path
 
@@ -51,8 +52,8 @@ def _git_env(project):
     return env
 
 
-def git(*args, cwd, project=None, timeout=None):
-    """Roda um comando git. Com `project`, as operações por SSH usam a chave dele."""
+def git(*args, cwd, project=None, timeout=None, env=None):
+    """Roda um comando git. Com `project`, as operações por SSH usam a chave dele; `env` soma variáveis ao ambiente."""
     try:
         process = subprocess.run(
             ["git", *args],
@@ -60,7 +61,7 @@ def git(*args, cwd, project=None, timeout=None):
             capture_output=True,
             text=True,
             timeout=timeout or settings.GIT_TIMEOUT,
-            env=_git_env(project),
+            env={**_git_env(project), **(env or {})},
         )
     except subprocess.TimeoutExpired:
         raise WorkspaceError(f"git {args[0]} passou do prazo sem resposta do repositório") from None
@@ -123,6 +124,21 @@ def prepare_workspace(run):
         git("worktree", "prune", cwd=repo)
         git("worktree", "add", "-B", run.branch, str(path), f"origin/{project.default_branch}", cwd=repo)
     return path
+
+
+def workspace_diff(run):
+    """Diff de tudo o que a execução mudou desde que saiu da branch padrão: os commits e o que ainda não foi commitado."""
+    path = workspace_path(run)
+    timeout = settings.RUN_DIFF_TIMEOUT
+    base = git("merge-base", "HEAD", f"origin/{run.project.default_branch}", cwd=path, timeout=timeout).strip()
+    # Arquivos novos só entram no diff se estiverem no índice. Um índice temporário os inclui sem mexer
+    # no índice do worktree, que o agente pode estar usando neste momento.
+    with tempfile.TemporaryDirectory() as directory:
+        env = {"GIT_INDEX_FILE": str(Path(directory) / "index")}
+        git("read-tree", "HEAD", cwd=path, timeout=timeout, env=env)
+        git("add", "-A", cwd=path, timeout=timeout, env=env)
+        options = ["-c", "core.quotePath=false", "diff", "--cached", "--no-color", "--no-ext-diff", "-M"]
+        return git(*options, base, cwd=path, timeout=timeout, env=env)
 
 
 def remove_workspace(run):

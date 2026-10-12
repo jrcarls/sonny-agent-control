@@ -139,6 +139,10 @@ GOOGLE_API_KEY = env("GOOGLE_API_KEY", default="")
 RUN_MAX_TOKENS = env.int("RUN_MAX_TOKENS", default=2_000_000)
 # Teto de passos do grafo por execução, para um agente em laço não rodar para sempre
 RUN_MAX_STEPS = env.int("RUN_MAX_STEPS", default=100)
+# Aba "Alterações" da execução: prazo, em segundos, para o git montar o diff e, por arquivo, o máximo de
+# linhas exibidas (acima disso a tela mostra só a contagem)
+RUN_DIFF_TIMEOUT = env.int("RUN_DIFF_TIMEOUT", default=30)
+RUN_DIFF_MAX_FILE_LINES = env.int("RUN_DIFF_MAX_FILE_LINES", default=2000)
 # Segundos sem sinal de vida do worker até uma execução em andamento ser dada como falha
 RUN_STALE_SECONDS = env.int("RUN_STALE_SECONDS", default=120)
 

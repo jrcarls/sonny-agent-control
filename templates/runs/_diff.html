@@ -1,0 +1,57 @@
+{# Aba "Alterações" da execução: o que mudou no worktree em relação à branch padrão, arquivo por arquivo #}
+{% if missing == "pending" %}
+    <c-empty-state icon="git-compare" title="A execução ainda não começou">As alterações aparecem aqui assim que o agente mexer no repositório.</c-empty-state>
+{% elif missing %}
+    <c-empty-state icon="git-compare" title="O worktree desta execução não existe mais">
+        Ele é apagado alguns dias depois de a execução terminar.
+        {% if run.pull_request_url %}As alterações enviadas estão no <a href="{{ run.pull_request_url }}" target="_blank" rel="noopener" class="font-medium text-fg-brand hover:underline">pull request</a>.{% elif run.pushed_at %}As alterações enviadas estão na branch <code class="font-mono">{{ run.branch }}</code> do repositório.{% else %}Nada foi enviado ao repositório.{% endif %}
+    </c-empty-state>
+{% elif error %}
+    <div class="rounded-base bg-danger-soft p-4 text-sm text-fg-danger-strong" role="alert">
+        <p class="font-medium">Não foi possível montar o diff</p>
+        <p class="mt-1 whitespace-pre-wrap break-words">{{ error }}</p>
+    </div>
+{% else %}
+    <div class="mb-4 flex flex-wrap items-center gap-x-3 gap-y-2 text-sm text-body">
+        {% if files %}
+            <span><span class="font-medium text-heading">{{ files|length }} arquivo{{ files|length|pluralize }}</span> alterado{{ files|length|pluralize }} em relação a <code class="font-mono text-heading">{{ run.project.default_branch }}</code></span>
+            <span class="font-mono font-medium text-fg-success-strong">+{{ additions }}</span>
+            <span class="font-mono font-medium text-fg-danger-strong">−{{ deletions }}</span>
+        {% endif %}
+        <c-button variant="secondary" size="sm" class="ms-auto" hx-get="{% url 'orchestrator:run_diff' run.pk %}" hx-target="#run-diff" hx-disabled-elt="this">Atualizar</c-button>
+    </div>
+    {% for file in files %}
+        <details open class="mb-4 overflow-hidden rounded-base border border-default bg-neutral-primary-soft shadow-xs">
+            <summary class="flex cursor-pointer flex-wrap items-center gap-x-3 gap-y-1 bg-neutral-secondary-medium px-4 py-2.5 text-sm">
+                <span class="break-all font-mono font-medium text-heading">{% if file.old_path %}{{ file.old_path }} → {% endif %}{{ file.path }}</span>
+                {% if file.status != "modified" %}
+                    <span class="inline-flex items-center whitespace-nowrap rounded px-1.5 py-0.5 text-xs font-medium {% if file.status == "added" %}bg-success-soft text-fg-success-strong{% elif file.status == "deleted" %}bg-danger-soft text-fg-danger-strong{% else %}bg-neutral-tertiary text-body{% endif %}">{% if file.status == "added" %}Novo{% elif file.status == "deleted" %}Removido{% else %}Renomeado{% endif %}</span>
+                {% endif %}
+                <span class="ms-auto whitespace-nowrap font-mono text-xs"><span class="text-fg-success-strong">+{{ file.additions }}</span> <span class="text-fg-danger-strong">−{{ file.deletions }}</span></span>
+            </summary>
+            {% if file.binary %}
+                <p class="border-t border-default px-4 py-3 text-sm text-body">Arquivo binário: o conteúdo não é exibido.</p>
+            {% elif file.too_large %}
+                <p class="border-t border-default px-4 py-3 text-sm text-body">Diff grande demais para exibir aqui. Veja o arquivo na branch <code class="font-mono">{{ run.branch }}</code>.</p>
+            {% elif file.hunks %}
+                <div class="overflow-x-auto border-t border-default">
+                    <table class="w-full border-collapse font-mono text-xs leading-5">
+                        {% for hunk in file.hunks %}
+                            <tr class="bg-brand-softer text-fg-brand-strong"><td colspan="4" class="px-3 py-1">{{ hunk.header }}</td></tr>
+                            {% for line in hunk.lines %}
+                                <tr class="{% if line.kind == "add" %}bg-success-soft{% elif line.kind == "del" %}bg-danger-soft{% endif %}">
+                                    <td class="w-px select-none whitespace-nowrap px-2 text-right text-body">{{ line.old|default_if_none:"" }}</td>
+                                    <td class="w-px select-none whitespace-nowrap px-2 text-right text-body">{{ line.new|default_if_none:"" }}</td>
+                                    <td class="w-px select-none ps-2 {% if line.kind == "add" %}text-fg-success-strong{% elif line.kind == "del" %}text-fg-danger-strong{% endif %}">{% if line.kind == "add" %}+{% elif line.kind == "del" %}−{% endif %}</td>
+                                    <td class="whitespace-pre px-2 text-heading">{{ line.text }}</td>
+                                </tr>
+                            {% endfor %}
+                        {% endfor %}
+                    </table>
+                </div>
+            {% endif %}
+        </details>
+    {% empty %}
+        <c-empty-state icon="git-compare" title="Nenhuma alteração no repositório">{% if run.is_working %}O agente ainda não mudou nenhum arquivo.{% else %}Esta execução não mudou nenhum arquivo.{% endif %}</c-empty-state>
+    {% endfor %}
+{% endif %}

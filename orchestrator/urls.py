@@ -24,6 +24,7 @@ urlpatterns = [
     path("integracoes/<str:service>/remover/", views.IntegrationDeleteView.as_view(), name="integration_delete"),
     path("execucoes/", views.RunListView.as_view(), name="run_list"),
     path("execucoes/<int:pk>/", views.RunDetailView.as_view(), name="run_detail"),
+    path("execucoes/<int:pk>/alteracoes/", views.RunDiffView.as_view(), name="run_diff"),
     path("execucoes/<int:pk>/cancelar/", views.RunCancelView.as_view(), name="run_cancel"),
     path("execucoes/<int:pk>/continuar/", views.RunResumeView.as_view(), name="run_resume"),
     path("execucoes/<int:pk>/repetir/", views.RunRetryView.as_view(), name="run_retry"),

@@ -1,5 +1,6 @@
 from datetime import timedelta
 
+from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.contrib.messages.views import SuccessMessageMixin
@@ -14,6 +15,7 @@ from django_htmx.http import HttpResponseClientRedirect
 from django.views.generic import CreateView, DeleteView, DetailView, ListView, TemplateView, UpdateView
 
 from .crypto import DecryptionError
+from .diffs import parse_diff
 from .forms import AgentForm, CredentialForm, ProjectForm, RunForm
 from .integrations import INTEGRATIONS, IntegrationError, Service, environment_variable, github_login, mask
 from .models import Agent, Approval, Credential, Project, Run, RunEvent
@@ -27,7 +29,7 @@ from .providers import (
     missing_api_keys,
 )
 from .tasks import execute_run
-from .workspace import WorkspaceError, list_remote_branches, workspace_path
+from .workspace import WorkspaceError, list_remote_branches, workspace_diff, workspace_path
 
 
 # Itens por página nas listas e execuções recentes mostradas na tela inicial
@@ -459,13 +461,44 @@ class RunDetailView(LoginRequiredMixin, DetailView):
     def get_context_data(self, **kwargs):
         pending = self.object.approvals.filter(status=Approval.Status.PENDING).select_related("agent")
         events = self.object.events.select_related("agent")
+        tab = "diff" if self.request.GET.get("aba") == "alteracoes" else "progress"
         return super().get_context_data(
-            **kwargs, pending_approvals=pending, events=events, can_resume=can_resume(self.object)
+            **kwargs, pending_approvals=pending, events=events, can_resume=can_resume(self.object), tab=tab
         )
 
     def get_template_names(self):
         # A tela consulta este mesmo endereço via htmx enquanto a execução está ativa
         return ["runs/_progress.html"] if self.request.htmx else ["runs/detail.html"]
+
+    def render_to_response(self, context, **kwargs):
+        response = super().render_to_response(context, **kwargs)
+        # A execução parou (terminou ou espera aprovação): avisa a aba "Alterações" para se atualizar
+        if self.request.htmx and not self.object.is_working:
+            response["HX-Trigger"] = "run-settled"
+        return response
+
+
+class RunDiffView(LoginRequiredMixin, View):
+    """Aba "Alterações" da execução: o diff do worktree dela contra a branch padrão, buscado pelo htmx."""
+
+    def get(self, request, pk):
+        run = get_object_or_404(Run.objects.select_related("project"), pk=pk)
+        if not request.htmx:
+            return redirect(f"{run.get_absolute_url()}?aba=alteracoes")
+        context = {"run": run}
+        if not workspace_path(run).exists():
+            # Antes de o worker preparar o repositório não há o que comparar; depois da limpeza, também não
+            context["missing"] = "pending" if run.status == Run.Status.QUEUED and not run.started_at else "removed"
+        else:
+            try:
+                files = parse_diff(workspace_diff(run), settings.RUN_DIFF_MAX_FILE_LINES)
+            except WorkspaceError as exc:
+                context["error"] = str(exc)
+            else:
+                context["files"] = files
+                context["additions"] = sum(item.additions for item in files)
+                context["deletions"] = sum(item.deletions for item in files)
+        return render(request, "runs/_diff.html", context)
 
 
 class RunCancelView(LoginRequiredMixin, View):

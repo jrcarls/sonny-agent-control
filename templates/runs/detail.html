@@ -11,6 +11,24 @@
     <h2 class="mb-3 text-lg font-semibold text-heading">Tarefa</h2>
     <div class="mb-8 whitespace-pre-wrap rounded-base border border-default bg-neutral-secondary-medium p-5 text-sm text-heading">{{ run.prompt }}</div>
 
-    {% include "runs/_progress.html" %}
+    {# Duas abas: o andamento (atualizado sozinho) e o diff do worktree, buscado só quando a aba é aberta #}
+    <div x-data="{ tab: '{{ tab }}' }">
+        <nav class="mb-6 flex gap-2 border-b border-default pb-3" aria-label="Seções da execução">
+            <button type="button" @click="tab = 'progress'" x-bind:aria-current="tab === 'progress' ? 'page' : false"
+                    class="cursor-pointer rounded-base px-3 py-1.5 text-sm font-medium"
+                    x-bind:class="tab === 'progress' ? 'bg-brand-softer text-fg-brand-strong' : 'text-body hover:bg-neutral-tertiary hover:text-heading'">Andamento</button>
+            <button type="button" @click="tab = 'diff'" x-bind:aria-current="tab === 'diff' ? 'page' : false"
+                    class="cursor-pointer rounded-base px-3 py-1.5 text-sm font-medium"
+                    x-bind:class="tab === 'diff' ? 'bg-brand-softer text-fg-brand-strong' : 'text-body hover:bg-neutral-tertiary hover:text-heading'">Alterações</button>
+        </nav>
+        <div x-show="tab === 'progress'" {% if tab != "progress" %}x-cloak{% endif %}>
+            {% include "runs/_progress.html" %}
+        </div>
+        <div x-show="tab === 'diff'" {% if tab != "diff" %}x-cloak{% endif %}>
+            <div id="run-diff" hx-get="{% url 'orchestrator:run_diff' run.pk %}" hx-trigger="intersect once, run-settled from:body">
+                <p class="text-sm text-body">Carregando as alterações…</p>
+            </div>
+        </div>
+    </div>
 </div>
 {% endblock %}
