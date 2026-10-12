@@ -54,4 +54,5 @@
     {% empty %}
         <c-empty-state icon="git-compare" title="Nenhuma alteração no repositório">{% if run.is_working %}O agente ainda não mudou nenhum arquivo.{% else %}Esta execução não mudou nenhum arquivo.{% endif %}</c-empty-state>
     {% endfor %}
+    {% if can_follow_up %}<div class="mt-6">{% include "runs/_follow_up.html" with place="diff" %}</div>{% endif %}
 {% endif %}

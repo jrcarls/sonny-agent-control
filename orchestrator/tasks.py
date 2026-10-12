@@ -12,7 +12,7 @@ from langgraph.checkpoint.postgres import PostgresSaver
 from langgraph.types import Command
 from psycopg.conninfo import make_conninfo
 
-from .graph import USAGE, build_graph, initial_state
+from .graph import USAGE, build_graph, follow_up_state, initial_state
 from .models import Approval, Run, RunEvent
 from .workspace import prepare_workspace, remove_workspace, workspace_path, workspaces_root
 
@@ -68,6 +68,9 @@ def _graph_input(run, snapshot):
         return Command(resume={item.tool_call_id: item.status == Approval.Status.APPROVED for item in approvals})
     if snapshot.next:
         return None  # parou no meio (falha ou worker reiniciado): continua do último passo salvo
+    if run.follow_up and snapshot.values.get("frames"):
+        # A execução já tinha terminado e a pessoa pediu um ajuste: o agente continua a mesma conversa
+        return follow_up_state(snapshot.values, run.follow_up)
     run.events.create(kind=RunEvent.Kind.STATUS, content=f"Agente {run.agent.name} começou a trabalhar.")
     if run.autonomous:
         run.events.create(
@@ -165,8 +168,9 @@ def execute_run(self, run_id):
             run.result = result
             run.status = Run.Status.SUCCEEDED
             run.finished_at = timezone.now()
+            run.follow_up = ""
             run.events.create(kind=RunEvent.Kind.STATUS, content="Execução concluída.")
-        run.save(update_fields=["result", "status", "finished_at"])
+        run.save(update_fields=["result", "status", "finished_at", "follow_up"])
 
 
 def _fail_orphaned(runs, reason):

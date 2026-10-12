@@ -1,0 +1,13 @@
+{# Pedido de ajuste em uma execução concluída. Uso: {% include "runs/_follow_up.html" with place="progress" %} #}
+<form method="post" action="{% url 'orchestrator:run_follow_up' run.pk %}" class="mb-8 rounded-base border border-default bg-neutral-primary-soft p-5 shadow-xs"
+      x-data="{ sending: false }" @submit="if (sending) $event.preventDefault(); sending = true">
+    {% csrf_token %}
+    <label for="follow-up-{{ place }}" class="mb-1 block text-base font-semibold text-heading">Pedir um ajuste</label>
+    <p class="mb-3 text-sm text-body">O agente continua esta mesma conversa, no mesmo worktree, com o que já fez.</p>
+    <c-input as="textarea" name="message" id="follow-up-{{ place }}" rows="3" required="1" placeholder="Ex.: troque o nome da função para algo mais claro e rode os testes de novo."
+             @keydown.ctrl.enter.prevent="$el.form.requestSubmit()" @keydown.meta.enter.prevent="$el.form.requestSubmit()"></c-input>
+    <div class="mt-3 flex items-center gap-3">
+        <c-button type="submit" size="sm" x-bind:disabled="sending">Enviar ao agente</c-button>
+        {% if run.autonomous %}<span class="text-sm text-fg-warning">Continua em modo autônomo.</span>{% endif %}
+    </div>
+</form>

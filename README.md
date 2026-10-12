@@ -130,7 +130,9 @@ o link para você abrir o pull request.
 - **Modo autônomo**: marcado ao enviar a tarefa, dispensa as aprovações daquela execução. O agente roda
   comandos e abre o pull request sem parar; nada é mesclado sozinho.
 
-Uma execução pode ser cancelada, continuada do último passo salvo (se falhou) ou repetida do zero.
+Uma execução pode ser cancelada, continuada do último passo salvo (se falhou) ou repetida do zero. Depois de
+concluída, a aba "Alterações" mostra o diff e você pode pedir um ajuste: o agente continua a mesma conversa, no
+mesmo worktree.
 
 > **Atenção:** a ferramenta "Rodar comando" executa no worktree, mas com o usuário e as permissões do
 > worker. Um comando aprovado alcança a máquina toda; a aprovação é a única barreira, e o modo autônomo

@@ -28,7 +28,7 @@ from .providers import (
     list_models,
     missing_api_keys,
 )
-from .tasks import execute_run
+from .tasks import MAX_EVENT_LENGTH, execute_run
 from .workspace import WorkspaceError, list_remote_branches, workspace_diff, workspace_path
 
 
@@ -487,6 +487,11 @@ def can_resume(run):
     return run.status == Run.Status.FAILED and workspace_path(run).exists()
 
 
+def can_follow_up(run):
+    """Uma execução concluída aceita pedidos de ajuste enquanto o worktree dela existir."""
+    return run.status == Run.Status.SUCCEEDED and workspace_path(run).exists()
+
+
 class RunDetailView(LoginRequiredMixin, DetailView):
     queryset = Run.objects.select_related("project", "agent")
     context_object_name = "run"
@@ -496,7 +501,12 @@ class RunDetailView(LoginRequiredMixin, DetailView):
         events = self.object.events.select_related("agent")
         tab = "diff" if self.request.GET.get("aba") == "alteracoes" else "progress"
         return super().get_context_data(
-            **kwargs, pending_approvals=pending, events=events, can_resume=can_resume(self.object), tab=tab
+            **kwargs,
+            pending_approvals=pending,
+            events=events,
+            can_resume=can_resume(self.object),
+            can_follow_up=can_follow_up(self.object),
+            tab=tab,
         )
 
     def get_template_names(self):
@@ -518,7 +528,7 @@ class RunDiffView(LoginRequiredMixin, View):
         run = get_object_or_404(Run.objects.select_related("project"), pk=pk)
         if not request.htmx:
             return redirect(f"{run.get_absolute_url()}?aba=alteracoes")
-        context = {"run": run}
+        context = {"run": run, "can_follow_up": can_follow_up(run)}
         if not workspace_path(run).exists():
             # Antes de o worker preparar o repositório não há o que comparar; depois da limpeza, também não
             context["missing"] = "pending" if run.status == Run.Status.QUEUED and not run.started_at else "removed"
@@ -567,6 +577,28 @@ class RunResumeView(LoginRequiredMixin, View):
                 enqueue(run, f"{request.user.get_username()} mandou continuar de onde parou.")
             else:
                 messages.error(request, "Esta execução não pode ser continuada.")
+        return redirect(run)
+
+
+class RunFollowUpView(LoginRequiredMixin, View):
+    """Pede um ajuste em uma execução concluída: o agente continua a mesma conversa, no mesmo worktree."""
+
+    def post(self, request, pk):
+        message = request.POST.get("message", "").strip()
+        with transaction.atomic():
+            run = get_object_or_404(Run.objects.select_for_update(), pk=pk)
+            if not message:
+                messages.error(request, "Escreva o ajuste antes de enviar.")
+            elif not can_follow_up(run):
+                messages.error(request, "Esta execução não pode receber ajustes.")
+            else:
+                run.follow_up = message
+                run.status = Run.Status.QUEUED
+                run.finished_at = None
+                run.cancel_requested = False
+                run.save(update_fields=["follow_up", "status", "finished_at", "cancel_requested"])
+                run.events.create(kind=RunEvent.Kind.NOTE, content=message[:MAX_EVENT_LENGTH])
+                enqueue(run, f"{request.user.get_username()} pediu um ajuste; a execução voltou para a fila.")
         return redirect(run)
 
 

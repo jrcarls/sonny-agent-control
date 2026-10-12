@@ -164,6 +164,9 @@ class Run(models.Model):
     pushed_at = models.DateTimeField("enviada em", null=True, blank=True)
     # Modo autônomo: as ferramentas sensíveis rodam direto, sem a execução parar para pedir aprovação
     autonomous = models.BooleanField("modo autônomo", default=False)
+    # Ajuste pedido depois de a execução terminar, ainda não entregue ao agente. O worker o acrescenta
+    # à conversa ao retomar a execução e o campo é esvaziado quando ela conclui de novo.
+    follow_up = models.TextField(blank=True)
     # Pedido de cancelamento de uma execução em andamento; o worker para no fim do passo atual
     cancel_requested = models.BooleanField(default=False)
     # Sinal de vida: o worker atualiza este horário enquanto trabalha na execução. Se ele para de
@@ -225,6 +228,7 @@ class RunEvent(models.Model):
     class Kind(models.TextChoices):
         STATUS = "status", "Situação"
         MESSAGE = "message", "Mensagem"
+        NOTE = "note", "Ajuste pedido"
         TOOL_CALL = "tool_call", "Ferramenta"
         TOOL_RESULT = "tool_result", "Resultado da ferramenta"
         DELEGATION = "delegation", "Delegação"

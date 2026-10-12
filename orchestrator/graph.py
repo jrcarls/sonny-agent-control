@@ -49,6 +49,13 @@ def initial_state(run):
     return {"frames": [frame], "memory": {}, "decisions": {}}
 
 
+def follow_up_state(values, message):
+    """Estado para continuar uma execução que já terminou: a mesma conversa, com o ajuste pedido no fim."""
+    frames = _copy(values["frames"])
+    frames[-1]["messages"].append(HumanMessage(message))
+    return {"frames": frames}
+
+
 def _load_agents(lead):
     """Agentes que podem participar: o escolhido e todos os alcançáveis por delegação (só os ativos)."""
     agents, delegates, pending = {lead.pk: lead}, {}, [lead]
