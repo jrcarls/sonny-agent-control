@@ -31,6 +31,7 @@ from .providers import (
     missing_api_keys,
 )
 from .tasks import MAX_EVENT_LENGTH, execute_run
+from .timeline import build_timeline
 from .workspace import WorkspaceError, list_remote_branches, workspace_diff, workspace_path
 
 
@@ -550,20 +551,29 @@ class RunDetailView(LoginRequiredMixin, DetailView):
 
     def get_context_data(self, **kwargs):
         pending = self.object.approvals.filter(status=Approval.Status.PENDING).select_related("agent")
-        events = self.object.events.select_related("agent")
-        tab = "diff" if self.request.GET.get("aba") == "alteracoes" else "progress"
-        return super().get_context_data(
+        timeline = build_timeline(self.object, self.object.events.select_related("agent"))
+        context = super().get_context_data(
             **kwargs,
             pending_approvals=pending,
-            events=events,
+            timeline=timeline,
+            last_event=max((item.last for item in timeline), default=0),
             can_resume=can_resume(self.object),
             can_follow_up=can_follow_up(self.object),
-            tab=tab,
+            tab="diff" if self.request.GET.get("aba") == "alteracoes" else "progress",
         )
+        if self.request.htmx:
+            # A consulta periódica diz até que evento a tela já tem (?depois=) e recebe só o que mudou:
+            # os itens novos e os que já estavam lá e ganharam o resultado da ferramenta
+            after = self.request.GET.get("depois", "")
+            after = int(after) if after.isdigit() else 0
+            changed = [item for item in timeline if item.last > after]
+            context["new_items"] = [item for item in changed if item.key > after]
+            context["updated_items"] = [item for item in changed if item.key <= after]
+        return context
 
     def get_template_names(self):
         # A tela consulta este mesmo endereço via htmx enquanto a execução está ativa
-        return ["runs/_progress.html"] if self.request.htmx else ["runs/detail.html"]
+        return ["runs/_poll.html"] if self.request.htmx else ["runs/detail.html"]
 
     def render_to_response(self, context, **kwargs):
         response = super().render_to_response(context, **kwargs)

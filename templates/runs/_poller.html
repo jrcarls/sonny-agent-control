@@ -1,0 +1,2 @@
+{# Consulta periódica do andamento. Só existe enquanto a execução está ativa; a resposta (_poll.html) traz o próximo. #}
+<div id="run-poller" {% if run.is_working %}hx-get="{{ run.get_absolute_url }}?depois={{ last_event }}" hx-trigger="every 2s" hx-swap="outerHTML"{% endif %}></div>

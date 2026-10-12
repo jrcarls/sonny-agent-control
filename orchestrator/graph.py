@@ -203,7 +203,9 @@ def build_graph(run, workspace, checkpointer):
                 except Exception as exc:  # o erro volta para o agente decidir o que fazer
                     content, status = f"Erro: {exc}", "error"
             frame["messages"].append(ToolMessage(content=content, tool_call_id=call["id"], name=name, status=status))
-            log.append(_entry(RunEvent.Kind.TOOL_RESULT, agent, content))
+            # Delegação recusada não tem chamada de ferramenta registrada: entra como evento de delegação
+            kind = RunEvent.Kind.DELEGATION if name == DELEGATE_TOOL else RunEvent.Kind.TOOL_RESULT
+            log.append(_entry(kind, agent, content))
         return {"frames": frames, "decisions": {}, "log": log}
 
     def delegate(state: State):

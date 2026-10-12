@@ -64,8 +64,10 @@ class SidebarTests(RunTestCase):
 
     def test_user_menu_items(self):
         page = self.client.get(reverse("home"))
-        for label in ["Integrações", "Preferências", "Configurações", "Idioma", "Sair"]:
+        for label in ["Integrações", "Modo escuro", "Sair"]:
             self.assertContains(page, label)
+        # Nada no menu aponta para lugar nenhum
+        self.assertNotContains(page, 'href="#"')
 
 
 class AnonymousSidebarTests(TestCase):

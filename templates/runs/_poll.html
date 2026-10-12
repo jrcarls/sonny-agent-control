@@ -1,0 +1,10 @@
+{# Resposta da consulta periódica: o próximo _poller e, fora do lugar (oob), a situação e só os itens que mudaram. #}
+{# Os itens que a pessoa já tinha na tela não são trocados, então continuam abertos ou selecionados. #}
+{% include "runs/_poller.html" %}
+{% include "runs/_status.html" with oob=True %}
+{% for item in updated_items %}{% include "runs/_event.html" with oob=True %}{% endfor %}
+{% if new_items %}
+    <ol hx-swap-oob="beforeend:#run-events">
+        {% for item in new_items %}{% include "runs/_event.html" %}{% endfor %}
+    </ol>
+{% endif %}

@@ -145,7 +145,7 @@ class RunViewTests(RunTestCase):
         run = self.make_run()
         run.events.create(kind=RunEvent.Kind.STATUS, content="Execução colocada na fila.")
         response = self.client.get(run.get_absolute_url(), headers={"HX-Request": "true"})
-        self.assertTemplateUsed(response, "runs/_progress.html")
+        self.assertTemplateUsed(response, "runs/_poll.html")
         self.assertTemplateNotUsed(response, "runs/detail.html")
         self.assertContains(response, "Execução colocada na fila.")
 

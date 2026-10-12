@@ -1,69 +1,8 @@
-{% load markdown %}
-{# Andamento da execução. Enquanto ela está ativa, o htmx busca este trecho de novo a cada 2s. #}
-<div id="run-progress"
-     {% if run.is_working %}hx-get="{{ run.get_absolute_url }}" hx-trigger="every 2s" hx-swap="outerHTML"{% endif %}>
-    <div class="mb-6 flex flex-wrap items-center gap-x-4 gap-y-2 text-sm text-body">
-        {% include "runs/_status_badge.html" with run=run %}
-        {% if run.autonomous %}<span class="inline-flex items-center whitespace-nowrap rounded bg-warning-soft px-1.5 py-0.5 text-xs font-medium text-fg-warning" title="As ações sensíveis rodam sem pedir aprovação">Autônomo</span>{% endif %}
-        <span>Criada em {{ run.created_at|date:"d/m/Y H:i" }}</span>
-        {% if run.finished_at %}<span>Finalizada em {{ run.finished_at|date:"d/m/Y H:i" }}</span>{% endif %}
-        <span>Branch <code class="font-mono text-heading">{{ run.branch }}</code></span>
-        {% if run.pull_request_url %}<a href="{{ run.pull_request_url }}" class="font-medium text-fg-brand hover:underline" target="_blank" rel="noopener">Ver pull request</a>{% elif run.compare_url %}<a href="{{ run.compare_url }}" class="font-medium text-fg-brand hover:underline" target="_blank" rel="noopener">Abrir pull request no GitHub</a>{% endif %}
-        {% if run.total_tokens %}<span>{{ run.input_tokens|floatformat:"0g" }} tokens de entrada, {{ run.output_tokens|floatformat:"0g" }} de saída{% if run.estimated_cost is not None %} · cerca de US$ {{ run.estimated_cost|floatformat:"2g" }}{% endif %}</span>{% endif %}
-    </div>
+{# Aba "Andamento": a situação da execução e a lista de eventos. Enquanto ela está ativa, o _poller busca o que mudou. #}
+{% include "runs/_status.html" %}
 
-    <div class="mb-6 flex flex-wrap items-center gap-3">
-        {% if run.status == "running" and run.cancel_requested %}
-            <span class="text-sm text-body">Cancelando: a execução para quando o passo atual terminar.</span>
-        {% elif run.status == "queued" or run.status == "running" or run.status == "waiting_approval" %}
-            <form method="post" action="{% url 'orchestrator:run_cancel' run.pk %}">
-                {% csrf_token %}
-                <c-button variant="secondary" size="sm" type="submit">Cancelar execução</c-button>
-            </form>
-        {% else %}
-            {% if can_resume %}
-                <form method="post" action="{% url 'orchestrator:run_resume' run.pk %}">
-                    {% csrf_token %}
-                    <c-button variant="secondary" size="sm" type="submit">Continuar de onde parou</c-button>
-                </form>
-            {% endif %}
-            <form method="post" action="{% url 'orchestrator:run_retry' run.pk %}">
-                {% csrf_token %}
-                <c-button variant="secondary" size="sm" type="submit">Rodar de novo do zero</c-button>
-            </form>
-        {% endif %}
-    </div>
-
-    {% if pending_approvals %}
-        <h2 class="mb-3 text-lg font-semibold text-heading">Aguardando sua aprovação</h2>
-        <div class="mb-8 space-y-4">
-            {% for approval in pending_approvals %}
-                {% include "approvals/_card.html" with approval=approval %}
-            {% endfor %}
-        </div>
-    {% endif %}
-
-    {% if run.result %}
-        <h2 class="mb-3 text-lg font-semibold text-heading">Resultado</h2>
-        <div class="markdown mb-8 rounded-base border border-default bg-neutral-primary-soft p-5 text-sm text-heading shadow-xs">{{ run.result|render_markdown }}</div>
-    {% endif %}
-
-    {% if can_follow_up %}{% include "runs/_follow_up.html" with place="progress" %}{% endif %}
-
-    <h2 class="mb-3 text-lg font-semibold text-heading">Andamento</h2>
-    <ol class="space-y-3">
-        {% for event in events %}
-            <li class="rounded-base border p-4 text-sm {% if event.kind == "error" %}border-danger-subtle bg-danger-soft text-fg-danger-strong{% elif event.kind == "delegation" or event.kind == "note" %}border-brand-subtle bg-brand-softer text-body{% else %}border-default bg-neutral-primary-soft text-body{% endif %}">
-                <div class="mb-1 flex items-center justify-between text-xs">
-                    <span class="font-medium">{% if event.agent %}{{ event.agent.name }} · {% endif %}{{ event.get_kind_display }}</span>
-                    <time datetime="{{ event.created_at|date:"c" }}">{{ event.created_at|date:"H:i:s" }}</time>
-                </div>
-                {% if event.kind == "message" %}
-                    <div class="markdown text-heading">{{ event.content|render_markdown }}</div>
-                {% else %}
-                    <p class="whitespace-pre-wrap {% if event.kind != "error" %}text-heading{% endif %} {% if event.kind == "tool_call" or event.kind == "tool_result" %}max-h-64 overflow-auto font-mono text-xs{% endif %}">{{ event.content }}</p>
-                {% endif %}
-            </li>
-        {% endfor %}
-    </ol>
-</div>
+<h2 class="mb-3 text-lg font-semibold text-heading">Andamento</h2>
+<ol id="run-events" class="space-y-2">
+    {% for item in timeline %}{% include "runs/_event.html" %}{% endfor %}
+</ol>
+{% include "runs/_poller.html" %}

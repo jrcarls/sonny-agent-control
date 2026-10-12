@@ -1,0 +1,51 @@
+{% load markdown tabler_icons %}
+{# Um item do andamento (timeline.Item). Com oob=True, o htmx troca o item que já está na tela. #}
+{% with event=item.event %}
+<li id="event-{{ item.key }}" {% if oob %}hx-swap-oob="true"{% endif %}>
+    {% if item.kind == "tool" %}
+        {# Ferramenta: uma linha com o que foi feito; a chamada e o resultado completos abrem ao clicar #}
+        <details class="group rounded-base border border-default bg-neutral-primary-soft text-sm">
+            <summary class="flex cursor-pointer list-none items-center gap-2 px-4 py-2 hover:bg-neutral-secondary-medium">
+                <span class="shrink-0 text-body transition-transform group-open:rotate-90">{% tabler_icon "chevron-right" "h-4 w-4" %}</span>
+                <span class="min-w-0 flex-1 truncate">
+                    {% if event.agent %}<span class="text-body">{{ event.agent.name }} · </span>{% endif %}<span class="font-medium text-heading">{{ item.verb }}</span>
+                    {% if item.target %}<code class="ms-1 font-mono text-xs text-heading">{{ item.target }}</code>{% endif %}
+                </span>
+                {% if item.label %}
+                    <span class="whitespace-nowrap rounded px-1.5 py-0.5 text-xs font-medium {% if item.state == "error" %}bg-danger-soft text-fg-danger-strong{% elif item.state == "warning" or item.state == "pending" %}bg-warning-soft text-fg-warning{% else %}bg-neutral-tertiary text-body{% endif %}">{{ item.label }}</span>
+                {% endif %}
+                <time class="shrink-0 text-xs text-body" datetime="{{ event.created_at|date:"c" }}">{{ event.created_at|date:"H:i:s" }}</time>
+            </summary>
+            <div class="space-y-3 border-t border-default px-4 py-3">
+                <div>
+                    <p class="mb-1 text-xs font-medium text-body">Chamada</p>
+                    <pre class="max-h-64 overflow-auto whitespace-pre-wrap break-words font-mono text-xs text-heading">{{ event.content }}</pre>
+                </div>
+                {% if item.result %}
+                    <div>
+                        <p class="mb-1 text-xs font-medium text-body">Resultado</p>
+                        <pre class="max-h-64 overflow-auto whitespace-pre-wrap break-words font-mono text-xs {% if item.state == "error" %}text-fg-danger-strong{% else %}text-heading{% endif %}">{{ item.result.content }}</pre>
+                    </div>
+                {% endif %}
+            </div>
+        </details>
+    {% elif item.kind == "status" %}
+        <p class="flex items-baseline gap-2 px-4 py-0.5 text-xs text-body">
+            <span class="flex-1">{{ event.content }}</span>
+            <time class="shrink-0" datetime="{{ event.created_at|date:"c" }}">{{ event.created_at|date:"H:i:s" }}</time>
+        </p>
+    {% else %}
+        <div class="rounded-base border p-4 text-sm {% if item.kind == "error" %}border-danger-subtle bg-danger-soft text-fg-danger-strong{% elif item.kind == "delegation" or item.kind == "note" %}border-brand-subtle bg-brand-softer text-body{% else %}border-default bg-neutral-primary-soft text-body{% endif %}">
+            <div class="mb-1 flex items-center justify-between text-xs">
+                <span class="font-medium">{% if event.agent %}{{ event.agent.name }} · {% endif %}{{ event.get_kind_display }}</span>
+                <time datetime="{{ event.created_at|date:"c" }}">{{ event.created_at|date:"H:i:s" }}</time>
+            </div>
+            {% if item.kind == "message" %}
+                <div class="markdown text-heading">{{ event.content|render_markdown }}</div>
+            {% else %}
+                <p class="whitespace-pre-wrap {% if item.kind != "error" %}text-heading{% endif %} {% if item.kind == "tool_result" %}max-h-64 overflow-auto font-mono text-xs{% endif %}">{{ event.content }}</p>
+            {% endif %}
+        </div>
+    {% endif %}
+</li>
+{% endwith %}
