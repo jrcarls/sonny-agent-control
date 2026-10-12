@@ -127,7 +127,31 @@ class WorkspaceDiffTests(RunTestCase):
         self.assertEqual((page.context["additions"], page.context["deletions"]), (3, 1))
         self.assertContains(page, "solto.txt")
         self.assertContains(page, "Projeto novo.")
-        self.assertContains(page, "Novo", count=2)
+        self.assertContains(page, ">Novo</span>", count=2)
+
+    def test_index_jumps_to_each_file_and_many_files_come_collapsed(self):
+        self.change()
+        page = self.client.get(self.url, headers=HTMX)
+        self.assertContains(page, 'aria-label="Arquivos alterados"')
+        self.assertContains(page, 'href="#diff-file-3"')
+        self.assertContains(page, 'id="diff-file-3" data-diff-file open')
+        self.assertContains(page, "Abrir todos")
+
+        for number in range(10):
+            (self.workspace / f"extra-{number}.txt").write_text("x\n")
+        page = self.client.get(self.url, headers=HTMX)
+        self.assertFalse(page.context["expanded"])
+        self.assertContains(page, "13 arquivos")
+        self.assertContains(page, 'id="diff-file-', count=13)
+        self.assertNotContains(page, "data-diff-file open")
+        self.assertContains(page, "eles vêm recolhidos")
+
+    def test_single_file_has_no_index(self):
+        (self.workspace / "solto.txt").write_text("dois\n")
+        page = self.client.get(self.url, headers=HTMX)
+        self.assertNotContains(page, 'aria-label="Arquivos alterados"')
+        self.assertNotContains(page, "Abrir todos")
+        self.assertContains(page, 'id="diff-file-1" data-diff-file open')
 
     @override_settings(RUN_DIFF_MAX_FILE_LINES=1)
     def test_large_file_is_not_rendered(self):

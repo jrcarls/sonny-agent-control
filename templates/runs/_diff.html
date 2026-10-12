@@ -12,16 +12,44 @@
         <p class="mt-1 whitespace-pre-wrap break-words">{{ error }}</p>
     </div>
 {% else %}
+    {# openFile: abre o arquivo escolhido no índice e rola até ele. setAll: abre ou recolhe todos. #}
+    <div x-data="{
+           openFile(id) { const file = document.getElementById(id); file.open = true; file.scrollIntoView({ behavior: 'smooth', block: 'start' }) },
+           setAll(open) { $el.querySelectorAll('details[data-diff-file]').forEach(file => file.open = open) }
+         }">
     <div class="mb-4 flex flex-wrap items-center gap-x-3 gap-y-2 text-sm text-body">
         {% if files %}
             <span><span class="font-medium text-heading">{{ files|length }} arquivo{{ files|length|pluralize }}</span> alterado{{ files|length|pluralize }} em relação a <code class="font-mono text-heading">{{ run.project.default_branch }}</code></span>
             <span class="font-mono font-medium text-fg-success-strong">+{{ additions }}</span>
             <span class="font-mono font-medium text-fg-danger-strong">−{{ deletions }}</span>
         {% endif %}
-        <c-button variant="secondary" size="sm" class="ms-auto" hx-get="{% url 'orchestrator:run_diff' run.pk %}" hx-target="#run-diff" hx-disabled-elt="this">Atualizar</c-button>
+        <span class="ms-auto flex flex-wrap items-center gap-3">
+            {% if files|length > 1 %}
+                <button type="button" @click="setAll(true)" class="cursor-pointer font-medium text-fg-brand hover:underline">Abrir todos</button>
+                <button type="button" @click="setAll(false)" class="cursor-pointer font-medium text-fg-brand hover:underline">Recolher todos</button>
+            {% endif %}
+            <c-button variant="secondary" size="sm" hx-get="{% url 'orchestrator:run_diff' run.pk %}" hx-target="#run-diff" hx-disabled-elt="this">Atualizar</c-button>
+        </span>
     </div>
+    {% if files|length > 1 %}
+        {# Índice: um arquivo por linha; clicar abre o arquivo e leva até ele #}
+        <nav aria-label="Arquivos alterados" class="mb-4 max-h-72 overflow-y-auto rounded-base border border-default bg-neutral-primary-soft shadow-xs">
+            <ul>
+                {% for file in files %}
+                    <li class="border-b border-default last:border-b-0">
+                        <a href="#diff-file-{{ forloop.counter }}" @click.prevent="openFile('diff-file-{{ forloop.counter }}')" class="flex items-center gap-3 px-4 py-1.5 text-sm hover:bg-neutral-secondary-medium">
+                            <span class="w-4 shrink-0 text-center font-mono text-xs font-semibold {% if file.status == "added" %}text-fg-success-strong{% elif file.status == "deleted" %}text-fg-danger-strong{% else %}text-body{% endif %}" title="{% if file.status == "added" %}Novo{% elif file.status == "deleted" %}Removido{% elif file.status == "renamed" %}Renomeado{% else %}Modificado{% endif %}">{% if file.status == "added" %}A{% elif file.status == "deleted" %}D{% elif file.status == "renamed" %}R{% else %}M{% endif %}</span>
+                            <span class="min-w-0 flex-1 truncate font-mono text-xs text-heading">{{ file.path }}</span>
+                            <span class="whitespace-nowrap font-mono text-xs"><span class="text-fg-success-strong">+{{ file.additions }}</span> <span class="text-fg-danger-strong">−{{ file.deletions }}</span></span>
+                        </a>
+                    </li>
+                {% endfor %}
+            </ul>
+        </nav>
+        {% if not expanded %}<p class="mb-4 text-sm text-body">São muitos arquivos, então eles vêm recolhidos: escolha um no índice ou abra todos.</p>{% endif %}
+    {% endif %}
     {% for file in files %}
-        <details open class="mb-4 overflow-hidden rounded-base border border-default bg-neutral-primary-soft shadow-xs">
+        <details id="diff-file-{{ forloop.counter }}" data-diff-file {% if expanded %}open{% endif %} class="mb-4 scroll-mt-4 overflow-hidden rounded-base border border-default bg-neutral-primary-soft shadow-xs">
             <summary class="flex cursor-pointer flex-wrap items-center gap-x-3 gap-y-1 bg-neutral-secondary-medium px-4 py-2.5 text-sm">
                 <span class="break-all font-mono font-medium text-heading">{% if file.old_path %}{{ file.old_path }} → {% endif %}{{ file.path }}</span>
                 {% if file.status != "modified" %}
@@ -55,4 +83,5 @@
         <c-empty-state icon="git-compare" title="Nenhuma alteração no repositório">{% if run.is_working %}O agente ainda não mudou nenhum arquivo.{% else %}Esta execução não mudou nenhum arquivo.{% endif %}</c-empty-state>
     {% endfor %}
     {% if can_follow_up %}<div class="mt-6">{% include "runs/_follow_up.html" with place="diff" %}</div>{% endif %}
+    </div>
 {% endif %}

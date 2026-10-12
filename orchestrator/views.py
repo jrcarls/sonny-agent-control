@@ -632,6 +632,9 @@ class RunDetailView(LoginRequiredMixin, DetailView):
 class RunDiffView(LoginRequiredMixin, View):
     """Aba "Alterações" da execução: o diff do worktree dela contra a branch padrão, buscado pelo htmx."""
 
+    # Até este número de arquivos, todos vêm abertos; acima, recolhidos, e a pessoa abre pelo índice
+    EXPANDED_FILES = 10
+
     def get(self, request, pk):
         run = get_object_or_404(Run.objects.select_related("project"), pk=pk)
         if not request.htmx:
@@ -647,6 +650,7 @@ class RunDiffView(LoginRequiredMixin, View):
                 context["error"] = str(exc)
             else:
                 context["files"] = files
+                context["expanded"] = len(files) <= self.EXPANDED_FILES
                 context["additions"] = sum(item.additions for item in files)
                 context["deletions"] = sum(item.deletions for item in files)
         return render(request, "runs/_diff.html", context)
