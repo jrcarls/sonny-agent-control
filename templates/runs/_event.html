@@ -18,12 +18,18 @@
             </summary>
             <div class="space-y-3 border-t border-default px-4 py-3">
                 <div>
-                    <p class="mb-1 text-xs font-medium text-body">Chamada</p>
+                    <div class="mb-1 flex items-center justify-between">
+                        <p class="text-xs font-medium text-body">Chamada</p>
+                        <c-copy label="Copiar chamada">{{ event.content }}</c-copy>
+                    </div>
                     <pre class="max-h-64 overflow-auto whitespace-pre-wrap break-words font-mono text-xs text-heading">{{ event.content }}</pre>
                 </div>
                 {% if item.result %}
                     <div>
-                        <p class="mb-1 text-xs font-medium text-body">Resultado</p>
+                        <div class="mb-1 flex items-center justify-between">
+                            <p class="text-xs font-medium text-body">Resultado</p>
+                            <c-copy label="Copiar resultado">{{ item.result.content }}</c-copy>
+                        </div>
                         <pre class="max-h-64 overflow-auto whitespace-pre-wrap break-words font-mono text-xs {% if item.state == "error" %}text-fg-danger-strong{% else %}text-heading{% endif %}">{{ item.result.content }}</pre>
                     </div>
                 {% endif %}
@@ -38,7 +44,10 @@
         <div class="rounded-base border p-4 text-sm {% if item.kind == "error" %}border-danger-subtle bg-danger-soft text-fg-danger-strong{% elif item.kind == "delegation" or item.kind == "note" %}border-brand-subtle bg-brand-softer text-body{% else %}border-default bg-neutral-primary-soft text-body{% endif %}">
             <div class="mb-1 flex items-center justify-between text-xs">
                 <span class="font-medium">{% if event.agent %}{{ event.agent.name }} · {% endif %}{{ event.get_kind_display }}</span>
-                <time datetime="{{ event.created_at|date:"c" }}">{{ event.created_at|date:"H:i:s" }}</time>
+                <span class="flex items-center gap-1.5">
+                    <time datetime="{{ event.created_at|date:"c" }}">{{ event.created_at|date:"H:i:s" }}</time>
+                    <c-copy label="{% if item.kind == "message" %}Copiar resposta{% else %}Copiar texto{% endif %}">{{ event.content }}</c-copy>
+                </span>
             </div>
             {% if item.kind == "message" %}
                 <div class="markdown text-heading">{{ event.content|render_markdown }}</div>

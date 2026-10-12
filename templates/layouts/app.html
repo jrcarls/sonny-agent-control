@@ -1,6 +1,9 @@
 {% extends "base.html" %}
 {% load static %}
-{% block extra_head %}<script defer src="{% static 'js/notify.js' %}"></script>{% endblock %}
+{% block extra_head %}
+    <script defer src="{% static 'js/notify.js' %}"></script>
+    <script src="{% static 'js/clipboard.js' %}"></script>
+{% endblock %}
 {% block body %}
     {% include "layouts/sidebar.html" %}
     <main class="px-4 py-4 transition-[margin] sm:ml-64 sm:px-6 lg:px-8 sm:sidebar-collapsed:ml-16">

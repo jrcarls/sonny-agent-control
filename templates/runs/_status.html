@@ -43,7 +43,10 @@
     {% endif %}
 
     {% if run.result %}
-        <h2 class="mb-3 text-lg font-semibold text-heading">Resultado</h2>
+        <div class="mb-3 flex items-center justify-between gap-3">
+            <h2 class="text-lg font-semibold text-heading">Resultado</h2>
+            <c-copy label="Copiar resultado">{{ run.result }}</c-copy>
+        </div>
         <div class="markdown mb-8 rounded-base border border-default bg-neutral-primary-soft p-5 text-sm text-heading shadow-xs">{{ run.result|render_markdown }}</div>
     {% endif %}
 

@@ -81,6 +81,31 @@ class ProgressPageTests(RunTestCase):
         self.assertContains(page, 'id="run-poller"')
         self.assertNotContains(page, "every 2s")
 
+    def test_agent_answers_can_be_copied_as_written(self):
+        run = self.make_run()
+        self.execute(run, tool_call("write_file", path="a.txt", content="1"), AIMessage(content="**Pronto** <fim>"))
+        page = self.client.get(run.get_absolute_url())
+        # Uma cópia na resposta do agente, uma na chamada da ferramenta e duas de resultado: o da
+        # ferramenta e o da execução. As linhas de situação não têm.
+        self.assertContains(page, "Copiar resposta</span>", count=1)
+        self.assertContains(page, "Copiar chamada</span>", count=1)
+        self.assertContains(page, "Copiar resultado</span>", count=2)
+        self.assertNotContains(page, "Copiar texto")
+        # O texto copiado é o Markdown original, não o HTML que a tela desenha
+        raw = '<textarea x-ref="text" hidden readonly tabindex="-1" aria-hidden="true">**Pronto** &lt;fim&gt;</textarea>'
+        self.assertContains(page, raw, count=2)
+        self.assertContains(page, "js/clipboard.js")
+
+    def test_errors_notes_and_delegations_can_be_copied_too(self):
+        run = self.make_run(status=Run.Status.FAILED)
+        run.events.create(kind=Kind.STATUS, content="Na fila.")
+        run.events.create(kind=Kind.NOTE, content="Mude o tom")
+        run.events.create(kind=Kind.DELEGATION, content="Revisor pediu a Programador:\nFaça", agent=self.agent)
+        run.events.create(kind=Kind.ERROR, content="RuntimeError: fora do ar")
+        page = self.client.get(run.get_absolute_url())
+        self.assertContains(page, "Copiar texto</span>", count=3)
+        self.assertContains(page, 'aria-hidden="true">RuntimeError: fora do ar</textarea>')
+
     def test_poll_returns_only_what_changed_since_the_last_event_on_screen(self):
         run = self.make_run(status=Run.Status.RUNNING)
         old = run.events.create(kind=Kind.STATUS, content="Na fila.")

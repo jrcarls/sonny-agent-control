@@ -1,0 +1,12 @@
+{% load tabler_icons %}
+{# Ícone que copia o texto do conteúdo, como foi escrito. Uso: <c-copy label="Copiar resposta">{{ texto }}</c-copy> #}
+<c-vars label="Copiar" class="" />
+<span x-data="{ copied: false, copy() { copyText($refs.text.value).then(() => { this.copied = true; setTimeout(() => this.copied = false, 2000) }) } }" class="inline-flex {{ class }}">
+    <textarea x-ref="text" hidden readonly tabindex="-1" aria-hidden="true">{{ slot }}</textarea>
+    <button type="button" @click="copy()" x-bind:title="copied ? 'Copiado' : '{{ label }}'" title="{{ label }}"
+            class="cursor-pointer rounded-base p-1 text-body hover:bg-neutral-tertiary hover:text-heading focus:outline-none focus:ring-2 focus:ring-brand-medium">
+        <span class="sr-only" x-text="copied ? 'Copiado' : '{{ label }}'">{{ label }}</span>
+        <span x-show="!copied">{% tabler_icon "copy" "h-4 w-4" %}</span>
+        <span x-cloak x-show="copied" class="text-fg-success-strong">{% tabler_icon "check" "h-4 w-4" %}</span>
+    </button>
+</span>
