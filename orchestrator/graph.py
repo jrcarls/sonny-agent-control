@@ -14,7 +14,7 @@ from langgraph.graph import END, START, StateGraph
 from langgraph.types import interrupt
 
 from .models import RunEvent
-from .providers import MODEL_PROVIDERS
+from .providers import MODEL_PROVIDERS, chat_model_options
 from .tools import TOOL_SPECS, build_tools
 
 DELEGATE_TOOL = "delegate_task"
@@ -39,8 +39,9 @@ class State(TypedDict, total=False):
 
 
 def build_chat_model(agent):
-    """Cria o modelo do agente. As chaves de API vêm das variáveis de ambiente de cada provedor."""
-    return init_chat_model(agent.model, model_provider=MODEL_PROVIDERS[agent.provider])
+    """Cria o modelo do agente, com a chave de Integrações ou, sem ela, a variável de ambiente do provedor."""
+    options = chat_model_options(agent.provider)
+    return init_chat_model(agent.model, model_provider=MODEL_PROVIDERS[agent.provider], **options)
 
 
 def initial_state(run):

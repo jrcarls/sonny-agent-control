@@ -1,6 +1,5 @@
 """O que o sistema sabe sobre cada provedor de LLM: nome no LangChain, chave de API e modelos sugeridos."""
 
-import os
 import re
 import time
 
@@ -8,6 +7,7 @@ from django.conf import settings
 from django.core.cache import cache
 from langchain.chat_models import init_chat_model
 
+from .integrations import INTEGRATIONS, get_secret, stored_secrets
 from .models import Agent
 
 Provider = Agent.Provider
@@ -20,13 +20,8 @@ MODEL_PROVIDERS = {
     Provider.OLLAMA: "ollama",
 }
 
-# Variáveis de ambiente que cada biblioteca de provedor aceita como chave (Ollama é local, sem chave)
-API_KEY_VARS = {
-    Provider.ANTHROPIC: ["ANTHROPIC_API_KEY"],
-    Provider.OPENAI: ["OPENAI_API_KEY"],
-    Provider.GOOGLE: ["GOOGLE_API_KEY", "GEMINI_API_KEY"],
-    Provider.OLLAMA: [],
-}
+# Provedores que pedem chave de API, cadastrada em Integrações ou no ambiente (Ollama é local, sem chave)
+KEYED_PROVIDERS = [Provider.ANTHROPIC, Provider.OPENAI, Provider.GOOGLE]
 
 # Sugestões do campo "Modelo" usadas quando não dá para consultar o provedor (sem chave, sem rede).
 # É só uma ajuda de digitação: qualquer identificador aceito pelo provedor funciona.
@@ -39,19 +34,29 @@ MODEL_SUGGESTIONS = {
 
 
 def missing_api_keys():
-    """Provedor -> nome da variável que falta, para os provedores sem chave configurada no servidor."""
+    """Provedor -> variável de ambiente dele, para os provedores sem chave (nem em Integrações, nem no servidor)."""
+    stored = stored_secrets()
     return {
-        provider.value: names[0]
-        for provider, names in API_KEY_VARS.items()
-        if names and not any(os.environ.get(name) for name in names)
+        provider.value: INTEGRATIONS[provider].env_vars[0]
+        for provider in KEYED_PROVIDERS
+        if not get_secret(provider, stored)
     }
+
+
+def chat_model_options(provider):
+    """Opções do init_chat_model com a chave cadastrada em Integrações.
+
+    Sem chave cadastrada não passa nada: a biblioteca do provedor lê a variável de ambiente sozinha.
+    """
+    secret = stored_secrets().get(provider)
+    return {"api_key": secret} if secret else {}
 
 
 def check_model(provider, model):
     """Manda uma mensagem curta ao modelo. Devolve (resposta, segundos); deixa o erro do provedor subir."""
     # Sem repetição e com prazo curto: é um teste rápido feito a partir da tela
     options = {} if provider == Provider.OLLAMA else {"timeout": settings.AGENT_TEST_TIMEOUT, "max_retries": 0}
-    chat = init_chat_model(model, model_provider=MODEL_PROVIDERS[provider], **options)
+    chat = init_chat_model(model, model_provider=MODEL_PROVIDERS[provider], **options, **chat_model_options(provider))
     started = time.monotonic()
     response = chat.invoke("Responda apenas com a palavra: ok")
     return str(response.text).strip(), time.monotonic() - started
@@ -72,10 +77,11 @@ def _is_chat_model(name):
 
 
 def _api_key(provider):
-    for name in API_KEY_VARS[provider]:
-        if os.environ.get(name):
-            return os.environ[name]
-    raise ModelListError(f"a chave {API_KEY_VARS[provider][0]} não está configurada no servidor")
+    secret = get_secret(provider)
+    if not secret:
+        variable = INTEGRATIONS[provider].env_vars[0]
+        raise ModelListError(f"sem chave: cadastre em Integrações ou defina {variable} no servidor")
+    return secret
 
 
 def _anthropic_models(timeout):
@@ -125,18 +131,32 @@ _LISTERS = {
 }
 
 
+def fetch_models(provider):
+    """Modelos de conversa consultados agora na API do provedor, sem cache. Serve também de teste da chave."""
+    try:
+        models = _LISTERS[Provider(provider)](settings.PROVIDER_LIST_TIMEOUT)
+    except ModelListError:
+        raise
+    except Exception as exc:
+        raise ModelListError(f"{type(exc).__name__}: {str(exc)[:200]}") from exc
+    if not models:
+        raise ModelListError("o provedor não devolveu nenhum modelo")
+    return models
+
+
+def _cache_key(provider):
+    return f"provider-models:{provider}"
+
+
 def list_models(provider):
     """Modelos de conversa que o provedor oferece agora, consultados na API dele (com cache)."""
-    key = f"provider-models:{provider}"
-    models = cache.get(key)
+    models = cache.get(_cache_key(provider))
     if models is None:
-        try:
-            models = _LISTERS[Provider(provider)](settings.PROVIDER_LIST_TIMEOUT)
-        except ModelListError:
-            raise
-        except Exception as exc:
-            raise ModelListError(f"{type(exc).__name__}: {str(exc)[:200]}") from exc
-        if not models:
-            raise ModelListError("o provedor não devolveu nenhum modelo")
-        cache.set(key, models, MODEL_LIST_CACHE_SECONDS)
+        models = fetch_models(provider)
+        cache.set(_cache_key(provider), models, MODEL_LIST_CACHE_SECONDS)
     return models
+
+
+def forget_models(provider):
+    """Descarta a lista guardada: a chave do provedor mudou e a próxima consulta deve usar a nova."""
+    cache.delete(_cache_key(provider))

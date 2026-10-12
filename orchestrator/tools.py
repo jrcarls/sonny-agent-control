@@ -32,7 +32,7 @@ TOOL_SPECS = {
     ),
     "open_pull_request": ToolSpec(
         "Abrir pull request",
-        "Faz commit e envia a branch. Com GITHUB_TOKEN abre o PR; sem ele, entrega o link para você abrir.",
+        "Faz commit e envia a branch. Com o token do GitHub abre o PR; sem ele, entrega o link para você abrir.",
         "Ações sensíveis",
         requires_approval=True,
     ),
@@ -73,6 +73,8 @@ def github_repository(repo_url):
 
 def build_tools(run, workspace, agent):
     """Ferramentas habilitadas para um agente, presas ao worktree da execução."""
+    # Importado aqui porque integrations depende de models, que depende deste módulo
+    from .integrations import Service, get_secret
 
     @tool
     def list_files(path: str = ".") -> str:
@@ -164,13 +166,14 @@ def build_tools(run, workspace, agent):
         repository = github_repository(project.repo_url)
         if repository is None:
             return f"Branch {run.branch} enviada para o repositório."
-        if not settings.GITHUB_TOKEN:
+        token = get_secret(Service.GITHUB)
+        if not token:
             link = f"{run.compare_url}&{urlencode({'title': title, 'body': body})}"
             return f"Branch {run.branch} enviada. O pull request ainda não foi aberto; para abri-lo, acesse: {link}"
 
         response = httpx.post(
             f"https://api.github.com/repos/{repository}/pulls",
-            headers={"Authorization": f"Bearer {settings.GITHUB_TOKEN}", "Accept": "application/vnd.github+json"},
+            headers={"Authorization": f"Bearer {token}", "Accept": "application/vnd.github+json"},
             json={"title": title, "body": body, "head": run.branch, "base": project.default_branch},
             timeout=settings.GITHUB_API_TIMEOUT,
         )

@@ -1,0 +1,19 @@
+{# Resultado do teste de uma integração (botão "Testar conexão" ou conferência depois de salvar), trocado no lugar pelo htmx #}
+{% load tabler_icons %}
+{% if error %}
+    <div class="flex gap-3 rounded-base bg-danger-soft p-3 text-sm text-fg-danger-strong" role="alert">
+        {% tabler_icon "alert-triangle" "h-5 w-5 shrink-0" %}
+        <div class="min-w-0">
+            <p class="font-medium">A conexão com {{ service.label }} falhou</p>
+            <p class="mt-0.5 break-words">{{ error }}</p>
+        </div>
+    </div>
+{% else %}
+    <div class="flex gap-3 rounded-base bg-success-soft p-3 text-sm text-fg-success-strong" role="status">
+        {% tabler_icon "circle-check" "h-5 w-5 shrink-0" %}
+        <div class="min-w-0">
+            <p class="font-medium">A chave de {{ service.label }} funciona</p>
+            <p class="mt-0.5 break-words">{{ detail }}</p>
+        </div>
+    </div>
+{% endif %}

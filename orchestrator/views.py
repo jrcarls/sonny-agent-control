@@ -4,7 +4,8 @@ from django.contrib import messages
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.contrib.messages.views import SuccessMessageMixin
 from django.db import transaction
-from django.db.models import ProtectedError
+from django.db.models import Count, ProtectedError
+from django.http import Http404
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse, reverse_lazy
 from django.utils import timezone
@@ -12,9 +13,19 @@ from django.views import View
 from django_htmx.http import HttpResponseClientRedirect
 from django.views.generic import CreateView, DeleteView, DetailView, ListView, TemplateView, UpdateView
 
-from .forms import AgentForm, ProjectForm, RunForm
-from .models import Agent, Approval, Project, Run, RunEvent
-from .providers import MODEL_SUGGESTIONS, ModelListError, check_model, list_models, missing_api_keys
+from .crypto import DecryptionError
+from .forms import AgentForm, CredentialForm, ProjectForm, RunForm
+from .integrations import INTEGRATIONS, IntegrationError, Service, environment_variable, github_login, mask
+from .models import Agent, Approval, Credential, Project, Run, RunEvent
+from .providers import (
+    MODEL_SUGGESTIONS,
+    ModelListError,
+    check_model,
+    fetch_models,
+    forget_models,
+    list_models,
+    missing_api_keys,
+)
 from .tasks import execute_run
 from .workspace import WorkspaceError, list_remote_branches, workspace_path
 
@@ -327,6 +338,95 @@ class AgentDeleteView(LoginRequiredMixin, ProtectedDeleteMixin, SuccessMessageMi
     success_url = reverse_lazy("orchestrator:agent_list")
     success_message = "Agente excluído."
     extra_context = {"cancel_url": success_url}
+
+
+def get_service(value):
+    if value not in Service.values:
+        raise Http404
+    return Service(value)
+
+
+def agents_per_service():
+    """Serviço -> agentes ativos que dependem da chave dele (no GitHub, os que podem abrir pull request)."""
+    active = Agent.objects.filter(is_active=True)
+    usage = dict(active.values_list("provider").annotate(Count("pk")))
+    usage[Service.GITHUB] = active.filter(tools__contains=["open_pull_request"]).count()
+    return usage
+
+
+class IntegrationListView(LoginRequiredMixin, TemplateView):
+    """Chaves de API dos provedores e do GitHub: de onde vem a que está em uso e o campo para cadastrar outra."""
+
+    template_name = "integrations/list.html"
+
+    def get_context_data(self, **kwargs):
+        credentials = {item.service: item for item in Credential.objects.select_related("updated_by")}
+        usage = agents_per_service()
+        # Depois de salvar, a tela volta com ?verificar=<serviço> e confere a chave nova sozinha
+        verify = self.request.GET.get("verificar")
+        items = []
+        for service, integration in INTEGRATIONS.items():
+            item = {
+                "service": service,
+                "integration": integration,
+                "variable": environment_variable(service),
+                "agents": usage.get(service, 0),
+            }
+            credential = credentials.get(service)
+            if credential:
+                item["credential"] = credential
+                try:
+                    item["hint"] = mask(credential.get_secret())
+                except DecryptionError:
+                    item["unreadable"] = True
+            # De onde vem a chave em uso: a salva aqui vale antes da variável de ambiente
+            item["source"] = "stored" if "hint" in item else "environment" if item["variable"] else ""
+            item["verify"] = verify == service and bool(item["source"])
+            # O painel da chave já vem aberto quando há algo para a pessoa ver ou resolver nele
+            item["open"] = item["verify"] or "unreadable" in item
+            # Agentes de um provedor sem chave falham; sem o token do GitHub o agente só entrega o link
+            item["broken"] = bool(item["agents"]) and not item["source"] and service != Service.GITHUB
+            items.append(item)
+        return super().get_context_data(**kwargs, integrations=items)
+
+
+class IntegrationSaveView(LoginRequiredMixin, View):
+    def post(self, request, service):
+        service = get_service(service)
+        form = CredentialForm(request.POST)
+        url = reverse("orchestrator:integration_list")
+        if not form.is_valid():
+            messages.error(request, f"A chave de {service.label} não foi salva: {form.errors['secret'][0]}")
+            return redirect(url)
+        form.save(service, request.user)
+        forget_models(service)
+        messages.success(request, f"Chave de {service.label} salva. Ela já vale para as próximas execuções.")
+        return redirect(f"{url}?verificar={service}")
+
+
+class IntegrationDeleteView(LoginRequiredMixin, View):
+    def post(self, request, service):
+        service = get_service(service)
+        Credential.objects.filter(service=service).delete()
+        forget_models(service)
+        messages.success(request, f"Chave de {service.label} removida.")
+        return redirect("orchestrator:integration_list")
+
+
+class IntegrationTestView(LoginRequiredMixin, View):
+    """Confere a chave em uso consultando o serviço: a lista de modelos do provedor ou a conta do token."""
+
+    def post(self, request, service):
+        service = get_service(service)
+        context = {"service": service}
+        try:
+            if service == Service.GITHUB:
+                context["detail"] = f"O token pertence à conta {github_login()}."
+            else:
+                context["detail"] = f"O provedor respondeu com {len(fetch_models(service))} modelos disponíveis."
+        except (IntegrationError, ModelListError) as exc:
+            context["error"] = str(exc)
+        return render(request, "integrations/_test_result.html", context)
 
 
 class RunListView(LoginRequiredMixin, ListView):

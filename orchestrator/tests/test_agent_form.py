@@ -195,7 +195,7 @@ class ListModelsTests(TestCase):
 
     def test_missing_key_and_empty_list_are_errors(self):
         with mock.patch.dict(os.environ, {"OPENAI_API_KEY": ""}):
-            with self.assertRaisesMessage(providers.ModelListError, "OPENAI_API_KEY não está configurada"):
+            with self.assertRaisesMessage(providers.ModelListError, "defina OPENAI_API_KEY no servidor"):
                 providers.list_models("openai")
         with mock.patch("ollama.Client") as client:
             client.return_value.list.return_value.models = []
@@ -217,12 +217,12 @@ class AgentModelsEndpointTests(AgentFormTestCase):
         self.assertContains(response, 'hx-swap-oob="true"')
 
     def test_failure_falls_back_to_fixed_suggestions_and_says_why(self):
-        error = providers.ModelListError("a chave OPENAI_API_KEY não está configurada no servidor")
+        error = providers.ModelListError("sem chave: cadastre em Integrações ou defina OPENAI_API_KEY no servidor")
         with mock.patch("orchestrator.views.list_models", side_effect=error):
             response = self.get(provider="openai")
         self.assertContains(response, '<option value="gpt-5"></option>')
         self.assertContains(response, "Não foi possível consultar")
-        self.assertContains(response, "OPENAI_API_KEY não está configurada")
+        self.assertContains(response, "defina OPENAI_API_KEY no servidor")
 
     def test_unknown_or_empty_provider_returns_no_options(self):
         with mock.patch("orchestrator.views.list_models") as lister:

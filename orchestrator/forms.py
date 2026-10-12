@@ -1,6 +1,6 @@
 from django import forms
 
-from .models import Agent, Project, Run
+from .models import Agent, Credential, Project, Run
 from .tools import DEFAULT_TOOLS, TOOL_SPECS
 
 
@@ -73,6 +73,19 @@ class AgentForm(forms.ModelForm):
         for name, spec in TOOL_SPECS.items():
             groups.setdefault(spec.group, []).append((options[name], spec))
         return list(groups.items())
+
+
+class CredentialForm(forms.Form):
+    """Chave de uma integração. Não é um ModelForm: o valor digitado nunca volta para a tela."""
+
+    secret = forms.CharField(label="Chave", max_length=500)
+
+    def save(self, service, user):
+        credential = Credential.objects.filter(service=service).first() or Credential(service=service)
+        credential.set_secret(self.cleaned_data["secret"])
+        credential.updated_by = user
+        credential.save()
+        return credential
 
 
 class RunForm(forms.ModelForm):

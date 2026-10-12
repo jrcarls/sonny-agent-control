@@ -32,7 +32,7 @@
                 {% for error in form.provider.errors %}<p class="mt-2 text-sm text-fg-danger-strong">{{ error }}</p>{% endfor %}
                 {% for provider, variable in missing_keys.items %}
                     <p x-cloak x-show="provider === '{{ provider }}'" class="mt-2 text-sm text-fg-warning">
-                        A chave deste provedor não está configurada no servidor (<code class="font-mono">{{ variable }}</code>). As execuções com ele vão falhar até ela ser definida.
+                        Este provedor está sem chave. Cadastre uma em <a href="{% url 'orchestrator:integration_list' %}" class="font-medium underline">Integrações</a> ou defina <code class="font-mono">{{ variable }}</code> no servidor; até lá, as execuções com ele vão falhar.
                     </p>
                 {% endfor %}
             </div>

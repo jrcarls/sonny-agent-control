@@ -3,7 +3,7 @@ from django.db import models
 from django.urls import reverse
 from django.utils import timezone
 
-from .crypto import encrypt, generate_ssh_keypair
+from .crypto import API_KEYS, decrypt, encrypt, generate_ssh_keypair
 from .tools import TOOL_SPECS, github_repository
 
 
@@ -81,6 +81,44 @@ class Agent(models.Model):
 
     def get_absolute_url(self):
         return reverse("orchestrator:agent_update", args=[self.pk])
+
+
+class Credential(models.Model):
+    """Chave de API cadastrada na tela de Integrações. Vale no lugar da variável de ambiente do servidor."""
+
+    class Service(models.TextChoices):
+        # Os provedores de LLM usam o mesmo valor de Agent.Provider
+        ANTHROPIC = "anthropic", "Anthropic"
+        OPENAI = "openai", "OpenAI"
+        GOOGLE = "google", "Google"
+        GITHUB = "github", "GitHub"
+
+    service = models.CharField("serviço", max_length=20, choices=Service, unique=True)
+    # Criptografada. A tela nunca devolve o valor: depois de salva, só o final dela aparece.
+    secret = models.TextField(editable=False)
+    updated_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        verbose_name="atualizada por",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="+",
+    )
+    updated_at = models.DateTimeField("atualizada em", auto_now=True)
+
+    class Meta:
+        verbose_name = "credencial"
+        verbose_name_plural = "credenciais"
+
+    def __str__(self):
+        return self.get_service_display()
+
+    def set_secret(self, value):
+        self.secret = encrypt(value, API_KEYS)
+
+    def get_secret(self):
+        """A chave em texto puro; DecryptionError se a SECRET_KEY mudou desde que ela foi salva."""
+        return decrypt(self.secret, API_KEYS)
 
 
 class Run(models.Model):

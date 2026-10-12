@@ -43,7 +43,7 @@ variável `COMPOSE_FILE`.
 ### Desenvolvimento
 
 ```bash
-cp .env.example .env     # preencha a chave do provedor de LLM
+cp .env.example .env     # a chave do provedor de LLM pode ir aqui ou na tela de Integrações
 docker compose up        # interface em http://localhost:8000
 ```
 
@@ -86,7 +86,7 @@ uv run celery -A config worker -l info   # executa os agentes (outro terminal)
 
 ## Configuração
 
-Tudo vem de variáveis de ambiente, lidas do `.env`. As principais:
+Quase tudo vem de variáveis de ambiente, lidas do `.env`. As principais:
 
 | Variável | Para que serve |
 |---|---|
@@ -96,6 +96,11 @@ Tudo vem de variáveis de ambiente, lidas do `.env`. As principais:
 | `CELERY_WORKER_CONCURRENCY` | Quantas execuções rodam ao mesmo tempo (padrão 2) |
 | `RUN_MAX_TOKENS` | Teto de tokens por execução, somando todos os agentes; 0 desliga |
 | `WORKSPACE_RETENTION_DAYS` | Dias que o worktree de uma execução finalizada fica guardado |
+
+As chaves dos provedores e o token do GitHub também podem ser cadastrados na tela **Integrações** (menu do
+usuário). A chave salva lá fica no banco, criptografada com a `SECRET_KEY`, vale antes da variável de ambiente e
+entra em uso na execução seguinte, sem reiniciar nada. Depois de salva, a tela mostra só o final dela; se a
+`SECRET_KEY` mudar, cadastre as chaves de novo.
 
 Os demais limites e prazos de operação (tempo máximo de um comando, tamanho da saída das ferramentas, passos
 por execução etc.) estão reunidos na seção "Orquestrador" do `config/settings.py`, e cada um aceita uma variável
@@ -108,9 +113,10 @@ cadastre-a no repositório (no GitHub, em *Settings → Deploy keys*, com *Allow
 SSH (`git@github.com:organizacao/repositorio.git`) no projeto. O botão "Testar acesso" confere a leitura.
 A chave privada fica no banco, criptografada com a `SECRET_KEY`: se a `SECRET_KEY` mudar, gere chaves novas.
 
-O `GITHUB_TOKEN` é opcional. Com ele, os agentes abrem o pull request sozinhos e os endereços `https` do
-GitHub também funcionam em repositórios privados. Sem ele, o agente envia a branch e entrega o link para
-você abrir o pull request.
+O token do GitHub é opcional. Com ele, na tela de Integrações ou no `GITHUB_TOKEN`, os agentes abrem o pull
+request sozinhos. Só a variável `GITHUB_TOKEN` faz os endereços `https` do GitHub funcionarem em repositórios
+privados, porque ela é aplicada ao git quando o container sobe. Sem token, o agente envia a branch e entrega
+o link para você abrir o pull request.
 
 ## Como funciona
 

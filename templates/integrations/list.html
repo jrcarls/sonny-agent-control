@@ -1,0 +1,121 @@
+{% extends "layouts/app.html" %}
+{% load tabler_icons %}
+
+{% block title %}Integrações{% endblock %}
+
+{% block content %}
+<div class="max-w-4xl py-6">
+    <div class="mb-6">
+        <h1 class="text-2xl font-semibold tracking-tight text-heading">Integrações</h1>
+        <p class="mt-1 text-sm text-body">Conecte os serviços que os agentes usam. Uma chave salva aqui vale no lugar da variável de ambiente do servidor.</p>
+        <p class="mt-3 flex items-center gap-1.5 text-xs text-body">
+            {% tabler_icon "lock" "h-4 w-4 shrink-0" %}
+            As chaves ficam criptografadas no banco e não são exibidas depois de salvas.
+        </p>
+    </div>
+
+    {% regroup integrations by integration.group as groups %}
+    {% for group in groups %}
+        <h2 class="mb-2 mt-8 text-[0.6875rem] font-semibold uppercase leading-4 tracking-widest text-body">{{ group.grouper }}</h2>
+        {# Uma linha por serviço; o botão da linha abre, logo abaixo, o painel com o campo da chave #}
+        <div class="overflow-hidden rounded-base border border-default bg-neutral-primary-soft shadow-xs">
+            {% for item in group.list %}
+                <section class="border-b border-default last:border-b-0" x-data="{ open: {{ item.open|yesno:'true,false' }}, show: false }">
+                    <div class="flex flex-wrap items-center gap-x-4 gap-y-3 p-4 sm:px-5">
+                        <span class="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-base bg-neutral-tertiary text-heading" aria-hidden="true">
+                            {% if item.integration.icon %}{% tabler_icon item.integration.icon "h-6 w-6" %}{% else %}<span class="text-base font-semibold">{{ item.service.label|first }}</span>{% endif %}
+                        </span>
+                        <div class="min-w-0 flex-1 basis-64">
+                            <div class="flex flex-wrap items-center gap-x-2.5 gap-y-1">
+                                <h3 class="text-base font-semibold text-heading">{{ item.service.label }}</h3>
+                                <span class="inline-flex items-center whitespace-nowrap rounded px-1.5 py-0.5 text-xs font-medium {% if item.source %}bg-success-soft text-fg-success-strong{% elif item.unreadable %}bg-danger-soft text-fg-danger-strong{% elif item.broken %}bg-warning-soft text-fg-warning{% else %}bg-neutral-tertiary text-body{% endif %}">
+                                    <span class="me-1.5 h-1.5 w-1.5 rounded-full bg-current"></span>
+                                    {% if item.source %}Conectada{% elif item.unreadable %}Chave ilegível{% else %}Não configurada{% endif %}
+                                </span>
+                            </div>
+                            <p class="mt-0.5 text-sm text-body">{{ item.integration.description }}</p>
+                            <p class="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-body">
+                                {% if item.source == "stored" %}
+                                    <code class="rounded bg-neutral-tertiary px-1.5 py-0.5 font-mono text-heading">{{ item.hint }}</code>
+                                    <span>salva em {{ item.credential.updated_at|date:"d/m/Y" }}{% if item.credential.updated_by %} por {{ item.credential.updated_by.get_username }}{% endif %}</span>
+                                {% elif item.source == "environment" %}
+                                    <span>Variável <code class="font-mono text-heading">{{ item.variable }}</code> do servidor</span>
+                                {% elif item.unreadable %}
+                                    <span class="text-fg-danger-strong">A chave salva não pôde ser lida (a <code class="font-mono">SECRET_KEY</code> mudou?). Cadastre-a de novo.</span>
+                                {% endif %}
+                                {% if item.agents %}
+                                    {% if item.source or item.unreadable %}<span aria-hidden="true">·</span>{% endif %}
+                                    <span {% if item.broken %}class="font-medium text-fg-warning"{% endif %}>
+                                        {% if item.service == "github" %}
+                                            {{ item.agents }} agente{{ item.agents|pluralize }} {{ item.agents|pluralize:"pode,podem" }} abrir pull request
+                                        {% elif item.broken %}
+                                            {{ item.agents }} agente{{ item.agents|pluralize }} {{ item.agents|pluralize:"usa,usam" }} este provedor e {{ item.agents|pluralize:"vai,vão" }} falhar sem a chave
+                                        {% else %}
+                                            Usada por {{ item.agents }} agente{{ item.agents|pluralize }}
+                                        {% endif %}
+                                    </span>
+                                {% endif %}
+                            </p>
+                        </div>
+                        <c-button variant="{% if item.source %}secondary{% else %}primary{% endif %}" size="sm" aria-controls="panel-{{ item.service }}" x-bind:aria-expanded="open.toString()"
+                                  @click="open = !open; if (open) $nextTick(() => $refs.secret.focus())">
+                            {% if item.source %}Gerenciar{% elif item.unreadable %}Cadastrar de novo{% else %}Conectar{% endif %}
+                            <span class="ms-1 transition-transform" x-bind:class="open && 'rotate-180'">{% tabler_icon "chevron-down" "h-4 w-4" %}</span>
+                        </c-button>
+                    </div>
+
+                    <div id="panel-{{ item.service }}" x-cloak x-show="open" class="border-t border-default bg-neutral-secondary-soft p-4 sm:px-5">
+                        <form method="post" action="{% url 'orchestrator:integration_save' item.service %}">
+                            {% csrf_token %}
+                            <label for="secret-{{ item.service }}" class="mb-2 block text-sm font-medium text-heading">{% if item.source %}Nova chave{% else %}Chave de API{% endif %}</label>
+                            <div class="flex items-start gap-3">
+                                <div class="relative flex-1">
+                                    <c-input type="password" x-bind:type="show ? 'text' : 'password'" x-ref="secret" name="secret" id="secret-{{ item.service }}" required="1" maxlength="500"
+                                             autocomplete="off" spellcheck="false" placeholder="{{ item.integration.placeholder }}" class="pe-10 font-mono" />
+                                    <button type="button" @click="show = !show" x-bind:aria-pressed="show.toString()" title="Mostrar ou ocultar o que foi digitado"
+                                            class="absolute inset-y-0 end-0 flex cursor-pointer items-center px-3 text-body hover:text-heading">
+                                        <span class="sr-only">Mostrar ou ocultar a chave digitada</span>
+                                        <span x-show="!show">{% tabler_icon "eye" "h-5 w-5" %}</span>
+                                        <span x-cloak x-show="show">{% tabler_icon "eye-off" "h-5 w-5" %}</span>
+                                    </button>
+                                </div>
+                                <c-button type="submit">Salvar</c-button>
+                            </div>
+                            <p class="mt-2 text-sm text-body">
+                                {% if item.source == "stored" %}
+                                    A chave atual continua valendo até você salvar outra.
+                                {% elif item.source == "environment" %}
+                                    Hoje a chave vem do servidor. Uma chave salva aqui passa a valer no lugar dela.
+                                {% endif %}
+                                Crie a chave em
+                                <a href="{{ item.integration.key_url }}" target="_blank" rel="noopener" class="inline-flex items-center font-medium text-fg-brand hover:underline">{{ item.integration.key_site }}{% tabler_icon "external-link" "ms-1 h-3.5 w-3.5" %}</a>.
+                                {{ item.integration.help }}
+                            </p>
+                        </form>
+
+                        {% if item.source or item.credential %}
+                            <div class="mt-4 flex flex-wrap items-center gap-3">
+                                {% if item.source %}
+                                    <c-button variant="secondary" size="sm" hx-post="{% url 'orchestrator:integration_test' item.service %}" hx-target="#test-result-{{ item.service }}"
+                                              hx-headers='{"X-CSRFToken": "{{ csrf_token }}"}' hx-disabled-elt="this" hx-indicator="#test-wait-{{ item.service }}">Testar conexão</c-button>
+                                    <span id="test-wait-{{ item.service }}" class="htmx-indicator text-sm text-body">Consultando {{ item.service.label }}…</span>
+                                {% endif %}
+                                {% if item.credential %}
+                                    <form method="post" action="{% url 'orchestrator:integration_delete' item.service %}" class="ms-auto"
+                                          onsubmit="return confirm('Remover a chave de {{ item.service.label }} salva aqui?{% if item.variable %} A variável {{ item.variable }} do servidor volta a valer.{% else %} Sem ela, este serviço fica sem chave.{% endif %}')">
+                                        {% csrf_token %}
+                                        <button type="submit" class="cursor-pointer text-sm font-medium text-fg-danger-strong hover:underline">Remover chave</button>
+                                    </form>
+                                {% endif %}
+                            </div>
+                            {# Logo depois de salvar, a chave nova é conferida sozinha ao abrir a página #}
+                            <div id="test-result-{{ item.service }}" class="mt-3 empty:hidden" aria-live="polite"
+                                 {% if item.verify %}hx-post="{% url 'orchestrator:integration_test' item.service %}" hx-trigger="load" hx-headers='{"X-CSRFToken": "{{ csrf_token }}"}' hx-indicator="#test-wait-{{ item.service }}"{% endif %}></div>
+                        {% endif %}
+                    </div>
+                </section>
+            {% endfor %}
+        </div>
+    {% endfor %}
+</div>
+{% endblock %}
