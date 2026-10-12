@@ -130,6 +130,9 @@ o link para você abrir o pull request.
 - **Modo autônomo**: marcado ao enviar a tarefa, dispensa as aprovações daquela execução. O agente roda
   comandos e abre o pull request sem parar; nada é mesclado sozinho.
 
+A tela **Uso e custo** soma os tokens das execuções por projeto e por agente. O custo é uma estimativa e só
+aparece para os agentes com preço do modelo preenchido no cadastro (dólares por milhão de tokens).
+
 Uma execução pode ser cancelada, continuada do último passo salvo (se falhou) ou repetida do zero. Depois de
 concluída, a aba "Alterações" mostra o diff e você pode pedir um ajuste: o agente continua a mesma conversa, no
 mesmo worktree.

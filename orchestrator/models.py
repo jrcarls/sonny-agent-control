@@ -1,3 +1,5 @@
+from decimal import Decimal
+
 from django.conf import settings
 from django.db import models
 from django.urls import reverse
@@ -82,6 +84,10 @@ class Agent(models.Model):
     description = models.CharField("papel", max_length=255, blank=True)
     provider = models.CharField("provedor", max_length=20, choices=Provider)
     model = models.CharField("modelo", max_length=100)
+    # Preço do modelo em dólares por milhão de tokens, como os provedores divulgam. Opcional: sem ele
+    # a tela de uso mostra só os tokens.
+    input_price = models.DecimalField("preço de entrada", max_digits=8, decimal_places=4, null=True, blank=True)
+    output_price = models.DecimalField("preço de saída", max_digits=8, decimal_places=4, null=True, blank=True)
     system_prompt = models.TextField("instruções", blank=True)
     # Nomes das ferramentas habilitadas (chaves de tools.TOOL_SPECS)
     tools = models.JSONField("ferramentas", default=list, blank=True)
@@ -214,6 +220,18 @@ class Run(models.Model):
     @property
     def total_tokens(self):
         return self.input_tokens + self.output_tokens
+
+    @property
+    def estimated_cost(self):
+        """Custo em dólares pelos preços do agente da execução; None se ele não tem preço cadastrado.
+
+        É uma estimativa: os tokens gastos por agentes chamados por delegação entram pelo preço deste.
+        """
+        agent = self.agent
+        if agent.input_price is None and agent.output_price is None:
+            return None
+        spent = self.input_tokens * (agent.input_price or 0) + self.output_tokens * (agent.output_price or 0)
+        return spent / Decimal(1_000_000)
 
     def mark_canceled(self):
         """Encerra a execução como cancelada; os pedidos de aprovação que esperavam resposta caem junto."""

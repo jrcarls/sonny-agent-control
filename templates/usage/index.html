@@ -1,0 +1,82 @@
+{% extends "layouts/app.html" %}
+{% load tabler_icons %}
+
+{% block title %}Uso e custo{% endblock %}
+
+{% block content %}
+<div class="py-6">
+    <h1 class="mb-4 text-2xl font-semibold tracking-tight text-heading">Uso e custo</h1>
+    <c-tabs label="Filtrar por período">
+        <c-tab href="{% url 'orchestrator:usage' %}?periodo=7" active="{% if period == '7' %}1{% endif %}">7 dias</c-tab>
+        <c-tab href="{% url 'orchestrator:usage' %}" active="{% if period == '30' %}1{% endif %}">30 dias</c-tab>
+        <c-tab href="{% url 'orchestrator:usage' %}?periodo=tudo" active="{% if period == 'tudo' %}1{% endif %}">Desde o início</c-tab>
+    </c-tabs>
+
+    {% if top_runs %}
+        <div class="mb-8 grid grid-cols-2 gap-4 lg:grid-cols-4">
+            <div class="rounded-base border border-default bg-neutral-primary-soft p-4 shadow-xs">
+                <div class="flex items-center justify-between text-body"><span class="text-sm">Execuções</span>{% tabler_icon "player-play" "h-5 w-5" %}</div>
+                <p class="mt-2 text-2xl font-semibold tabular-nums text-heading">{{ totals.runs|floatformat:"0g" }}</p>
+            </div>
+            <div class="rounded-base border border-default bg-neutral-primary-soft p-4 shadow-xs">
+                <div class="flex items-center justify-between text-body"><span class="text-sm">Tokens de entrada</span>{% tabler_icon "arrow-down" "h-5 w-5" %}</div>
+                <p class="mt-2 text-2xl font-semibold tabular-nums text-heading">{{ totals.input|floatformat:"0g" }}</p>
+            </div>
+            <div class="rounded-base border border-default bg-neutral-primary-soft p-4 shadow-xs">
+                <div class="flex items-center justify-between text-body"><span class="text-sm">Tokens de saída</span>{% tabler_icon "arrow-up" "h-5 w-5" %}</div>
+                <p class="mt-2 text-2xl font-semibold tabular-nums text-heading">{{ totals.output|floatformat:"0g" }}</p>
+            </div>
+            <div class="rounded-base border border-default bg-neutral-primary-soft p-4 shadow-xs">
+                <div class="flex items-center justify-between text-body"><span class="text-sm">Custo estimado</span>{% tabler_icon "coin" "h-5 w-5" %}</div>
+                <p class="mt-2 text-2xl font-semibold tabular-nums text-heading">{% if totals.cost is None %}—{% else %}US$ {{ totals.cost|floatformat:"2g" }}{% endif %}</p>
+            </div>
+        </div>
+
+        {% if totals.unpriced %}
+            <p class="mb-8 rounded-base bg-warning-soft p-4 text-sm text-fg-warning">
+                {{ totals.unpriced }} execuç{{ totals.unpriced|pluralize:"ão,ões" }} {{ totals.unpriced|pluralize:"ficou,ficaram" }} fora do custo porque o agente não tem preço cadastrado.
+                Preencha o preço do modelo no <a href="{% url 'orchestrator:agent_list' %}" class="font-medium underline">cadastro do agente</a> para incluí-las.
+            </p>
+        {% endif %}
+
+        <h2 class="mb-3 text-lg font-semibold text-heading">Por projeto</h2>
+        <div class="mb-8">{% include "usage/_table.html" with rows=by_project column="Projeto" %}</div>
+
+        <h2 class="mb-3 text-lg font-semibold text-heading">Por agente</h2>
+        <div class="mb-8">{% include "usage/_table.html" with rows=by_agent column="Agente" %}</div>
+
+        <h2 class="mb-3 text-lg font-semibold text-heading">Execuções que mais consumiram</h2>
+        <div class="mb-4 overflow-x-auto rounded-base border border-default bg-neutral-primary-soft shadow-xs">
+            <table class="w-full text-left text-sm text-body">
+                <thead class="border-b border-default bg-neutral-secondary-medium text-sm text-body">
+                    <tr>
+                        <th scope="col" class="px-6 py-3 font-medium">Tarefa</th>
+                        <th scope="col" class="px-6 py-3 font-medium">Projeto</th>
+                        <th scope="col" class="px-6 py-3 font-medium">Agente</th>
+                        <th scope="col" class="px-6 py-3 text-right font-medium">Tokens</th>
+                        <th scope="col" class="px-6 py-3 text-right font-medium">Custo estimado</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for run in top_runs %}
+                        <tr class="border-b border-default last:border-0">
+                            <th scope="row" class="max-w-xl px-6 py-4 font-medium text-heading">
+                                <a href="{{ run.get_absolute_url }}" class="block truncate hover:underline">{{ run.prompt|truncatechars:80 }}</a>
+                            </th>
+                            <td class="px-6 py-4">{{ run.project.name }}</td>
+                            <td class="px-6 py-4">{{ run.agent.name }}</td>
+                            <td class="px-6 py-4 text-right tabular-nums">{{ run.total|floatformat:"0g" }}</td>
+                            <td class="whitespace-nowrap px-6 py-4 text-right tabular-nums">{% if run.estimated_cost is None %}—{% else %}US$ {{ run.estimated_cost|floatformat:"2g" }}{% endif %}</td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        <p class="text-sm text-body">
+            O custo é uma estimativa: usa o preço atual do agente que recebeu a tarefa, inclusive para os tokens gastos por agentes chamados por delegação.
+        </p>
+    {% else %}
+        <c-empty-state icon="chart-bar" title="Nenhum consumo neste período">Os tokens aparecem aqui conforme as execuções rodam.</c-empty-state>
+    {% endif %}
+</div>
+{% endblock %}

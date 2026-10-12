@@ -48,6 +48,10 @@
                 {% for error in form.model.errors %}<p class="mt-2 text-sm text-fg-danger-strong">{{ error }}</p>{% endfor %}
                 <p id="model-source" class="mt-2 text-sm text-body">{{ form.model.help_text }}</p>
             </div>
+            <div class="grid gap-x-4 sm:grid-cols-2">
+                <c-field :field="form.input_price" />
+                <c-field :field="form.output_price" />
+            </div>
             <div class="flex flex-wrap items-start gap-3">
                 <c-button variant="secondary" type="button" hx-post="{% url 'orchestrator:agent_test' %}" hx-include="closest form" hx-target="#agent-test-result" hx-disabled-elt="this" hx-indicator="#agent-test-wait">Testar agente</c-button>
                 <span id="agent-test-wait" class="htmx-indicator self-center text-sm text-body">Testando, pode levar alguns segundos…</span>

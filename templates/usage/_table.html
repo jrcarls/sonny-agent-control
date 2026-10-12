@@ -1,0 +1,27 @@
+{# Tabela de consumo por projeto ou por agente. Uso: {% include "usage/_table.html" with rows=by_project column="Projeto" %} #}
+<div class="overflow-x-auto rounded-base border border-default bg-neutral-primary-soft shadow-xs">
+    <table class="w-full text-left text-sm text-body">
+        <thead class="border-b border-default bg-neutral-secondary-medium text-sm text-body">
+            <tr>
+                <th scope="col" class="px-6 py-3 font-medium">{{ column }}</th>
+                <th scope="col" class="px-6 py-3 text-right font-medium">Execuções</th>
+                <th scope="col" class="px-6 py-3 text-right font-medium">Entrada</th>
+                <th scope="col" class="px-6 py-3 text-right font-medium">Saída</th>
+                <th scope="col" class="px-6 py-3 text-right font-medium">Custo estimado</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for row in rows %}
+                <tr class="border-b border-default last:border-0">
+                    <th scope="row" class="px-6 py-4 font-medium text-heading">{{ row.name }}</th>
+                    <td class="px-6 py-4 text-right tabular-nums">{{ row.runs|floatformat:"0g" }}</td>
+                    <td class="px-6 py-4 text-right tabular-nums">{{ row.input|floatformat:"0g" }}</td>
+                    <td class="px-6 py-4 text-right tabular-nums">{{ row.output|floatformat:"0g" }}</td>
+                    <td class="whitespace-nowrap px-6 py-4 text-right tabular-nums">
+                        {% if row.cost is None %}<span title="Sem preço cadastrado nos agentes destas execuções">—</span>{% else %}US$ {{ row.cost|floatformat:"2g" }}{% if row.unpriced %}<span title="{{ row.unpriced }} execuç{{ row.unpriced|pluralize:'ão,ões' }} sem preço ficaram fora"> *</span>{% endif %}{% endif %}
+                    </td>
+                </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>

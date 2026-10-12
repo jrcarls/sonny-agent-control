@@ -30,6 +30,15 @@
                 {% if sidebar.pending_approvals %}<span class="ms-auto inline-flex min-w-5 items-center justify-center rounded-full bg-amber-100 px-1.5 py-0.5 text-[0.6875rem] font-semibold leading-4 tabular-nums text-amber-800 dark:bg-amber-900 dark:text-amber-200 sm:sidebar-collapsed:hidden">{{ sidebar.pending_approvals }}<span class="sr-only"> pendentes</span></span>{% endif %}
             </a>
         </li>
+        <li>
+            <a href="{% url 'orchestrator:usage' %}" title="Uso e custo" {% if sidebar.section == "usage" %}aria-current="page"{% endif %}
+               class="flex items-center px-2 py-2 text-sm leading-5 rounded-lg group sm:sidebar-collapsed:justify-center {% if sidebar.section == "usage" %}bg-gray-100 font-semibold text-gray-900 dark:bg-gray-700 dark:text-white{% else %}font-medium text-gray-600 hover:bg-gray-100 hover:text-gray-900 dark:text-gray-300 dark:hover:bg-gray-700 dark:hover:text-white{% endif %}">
+                <span class="relative shrink-0">
+                    {% if sidebar.section == "usage" %}{% tabler_icon "chart-bar" "shrink-0 w-5 h-5 transition duration-75 text-primary-600 dark:text-primary-400" %}{% else %}{% tabler_icon "chart-bar" "shrink-0 w-5 h-5 transition duration-75 text-gray-400 group-hover:text-gray-900 dark:group-hover:text-white" %}{% endif %}
+                </span>
+                <span class="ml-3 sm:sidebar-collapsed:hidden">Uso e custo</span>
+            </a>
+        </li>
     </ul>
 
     <p class="mt-6 px-2 mb-2 text-[0.6875rem] font-semibold leading-4 tracking-widest text-gray-400 uppercase dark:text-gray-500 sm:sidebar-collapsed:hidden">Cadastros</p>

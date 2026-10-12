@@ -67,10 +67,26 @@ class AgentForm(forms.ModelForm):
 
     class Meta:
         model = Agent
-        fields = ["name", "description", "provider", "model", "system_prompt", "skills", "tools", "delegates", "is_active"]
+        fields = [
+            "name",
+            "description",
+            "provider",
+            "model",
+            "input_price",
+            "output_price",
+            "system_prompt",
+            "skills",
+            "tools",
+            "delegates",
+            "is_active",
+        ]
+        # Aceita o número como é escrito em português (3,50) e o mostra do mesmo jeito
+        localized_fields = ["input_price", "output_price"]
         widgets = {
             "description": forms.TextInput(attrs={"placeholder": "Ex.: revisa pull requests"}),
             "model": forms.TextInput(attrs={"placeholder": "Escolha uma sugestão ou digite o identificador"}),
+            "input_price": forms.TextInput(attrs={"placeholder": "Ex.: 3,00", "inputmode": "decimal"}),
+            "output_price": forms.TextInput(attrs={"placeholder": "Ex.: 15,00", "inputmode": "decimal"}),
             "system_prompt": forms.Textarea(
                 attrs={
                     "rows": 16,
@@ -84,6 +100,8 @@ class AgentForm(forms.ModelForm):
         help_texts = {
             "description": "Os outros agentes leem isto para decidir o que delegar a ele.",
             "model": "Identificador do modelo no provedor escolhido.",
+            "input_price": "Em dólares por milhão de tokens. Opcional: serve para estimar o custo na tela de uso.",
+            "output_price": "Em dólares por milhão de tokens.",
             "is_active": "Agentes inativos não podem receber novas tarefas.",
         }
 

@@ -1,11 +1,13 @@
 from datetime import timedelta
+from decimal import Decimal
 
 from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.contrib.messages.views import SuccessMessageMixin
 from django.db import transaction
-from django.db.models import Count, ProtectedError
+from django.db.models import Count, DecimalField, ExpressionWrapper, F, ProtectedError, Q, Sum, Value
+from django.db.models.functions import Coalesce
 from django.http import Http404
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse, reverse_lazy
@@ -340,6 +342,56 @@ class AgentDeleteView(LoginRequiredMixin, ProtectedDeleteMixin, SuccessMessageMi
     success_url = reverse_lazy("orchestrator:agent_list")
     success_message = "Agente excluído."
     extra_context = {"cancel_url": success_url}
+
+
+class UsageView(LoginRequiredMixin, TemplateView):
+    """Tokens gastos e custo estimado das execuções em um período, no total, por projeto e por agente."""
+
+    template_name = "usage/index.html"
+    # Valor de ?periodo= -> dias para trás; None é desde sempre
+    PERIODS = {"7": 7, "30": 30, "tudo": None}
+    DEFAULT_PERIOD = "30"
+    TOP_RUNS = 10
+    # Custo de uma execução pelos preços (dólares por milhão de tokens) do agente dela. Sem preço
+    # cadastrado o resultado é nulo, e as somas deixam a execução de fora.
+    COST = ExpressionWrapper(
+        (
+            F("input_tokens") * Coalesce(F("agent__input_price"), Value(Decimal(0)))
+            + F("output_tokens") * Coalesce(F("agent__output_price"), Value(Decimal(0)))
+        )
+        / Value(Decimal(1_000_000)),
+        output_field=DecimalField(max_digits=20, decimal_places=6),
+    )
+    UNPRICED = Q(agent__input_price__isnull=True, agent__output_price__isnull=True)
+    TOTALS = {
+        "runs": Count("pk"),
+        "input": Coalesce(Sum("input_tokens"), 0),
+        "output": Coalesce(Sum("output_tokens"), 0),
+        "cost": Sum(COST, filter=~UNPRICED),
+        # Execuções que gastaram tokens, mas ficaram fora do custo porque o agente não tem preço
+        "unpriced": Count("pk", filter=UNPRICED & (Q(input_tokens__gt=0) | Q(output_tokens__gt=0))),
+    }
+
+    def breakdown(self, runs, field):
+        rows = runs.values(name=F(field)).annotate(**self.TOTALS).filter(Q(input__gt=0) | Q(output__gt=0))
+        return sorted(rows, key=lambda row: row["input"] + row["output"], reverse=True)
+
+    def get_context_data(self, **kwargs):
+        period = self.request.GET.get("periodo")
+        if period not in self.PERIODS:
+            period = self.DEFAULT_PERIOD
+        runs = Run.objects.all()
+        if days := self.PERIODS[period]:
+            runs = runs.filter(created_at__gte=timezone.now() - timedelta(days=days))
+        spenders = runs.annotate(total=F("input_tokens") + F("output_tokens")).filter(total__gt=0)
+        return super().get_context_data(
+            **kwargs,
+            period=period,
+            totals=runs.aggregate(**self.TOTALS),
+            by_project=self.breakdown(runs, "project__name"),
+            by_agent=self.breakdown(runs, "agent__name"),
+            top_runs=spenders.select_related("project", "agent").order_by("-total")[: self.TOP_RUNS],
+        )
 
 
 class SkillListView(LoginRequiredMixin, ListView):

@@ -5,7 +5,7 @@ from .models import Approval, Run
 
 RECENT_RUNS = 8
 # Prefixo do nome da rota -> item do menu que fica destacado
-SECTIONS = {"run": "runs", "approval": "approvals", "project": "projects", "agent": "agents", "skill": "skills"}
+SECTIONS = {"run": "runs", "approval": "approvals", "project": "projects", "agent": "agents", "skill": "skills", "usage": "usage"}
 
 
 def _section(path):

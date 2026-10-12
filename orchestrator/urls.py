@@ -18,6 +18,7 @@ urlpatterns = [
     path("agentes/modelos/", views.AgentModelsView.as_view(), name="agent_models"),
     path("agentes/<int:pk>/", views.AgentUpdateView.as_view(), name="agent_update"),
     path("agentes/<int:pk>/excluir/", views.AgentDeleteView.as_view(), name="agent_delete"),
+    path("uso/", views.UsageView.as_view(), name="usage"),
     path("skills/", views.SkillListView.as_view(), name="skill_list"),
     path("skills/nova/", views.SkillCreateView.as_view(), name="skill_create"),
     path("skills/<int:pk>/", views.SkillUpdateView.as_view(), name="skill_update"),

@@ -9,7 +9,7 @@
         {% if run.finished_at %}<span>Finalizada em {{ run.finished_at|date:"d/m/Y H:i" }}</span>{% endif %}
         <span>Branch <code class="font-mono text-heading">{{ run.branch }}</code></span>
         {% if run.pull_request_url %}<a href="{{ run.pull_request_url }}" class="font-medium text-fg-brand hover:underline" target="_blank" rel="noopener">Ver pull request</a>{% elif run.compare_url %}<a href="{{ run.compare_url }}" class="font-medium text-fg-brand hover:underline" target="_blank" rel="noopener">Abrir pull request no GitHub</a>{% endif %}
-        {% if run.total_tokens %}<span>{{ run.input_tokens }} tokens de entrada, {{ run.output_tokens }} de saída</span>{% endif %}
+        {% if run.total_tokens %}<span>{{ run.input_tokens|floatformat:"0g" }} tokens de entrada, {{ run.output_tokens|floatformat:"0g" }} de saída{% if run.estimated_cost is not None %} · cerca de US$ {{ run.estimated_cost|floatformat:"2g" }}{% endif %}</span>{% endif %}
     </div>
 
     <div class="mb-6 flex flex-wrap items-center gap-3">
