@@ -27,8 +27,10 @@ class Integration:
     key_url: str
     key_site: str
     placeholder: str
-    # Ícone do Tabler; sem ele a tela mostra a inicial do serviço
+    # Ícone do Tabler; sem ele nem logo a tela mostra a inicial do serviço
     icon: str = ""
+    # Logo da marca que o Tabler não tem: arquivo em templates/brands/, sem a extensão
+    logo: str = ""
     # Orientação extra mostrada junto do campo da chave
     help: str = ""
 
@@ -41,6 +43,7 @@ INTEGRATIONS = {
         "https://console.anthropic.com/settings/keys",
         "Console da Anthropic",
         "sk-ant-…",
+        logo="anthropic",
     ),
     Service.OPENAI: Integration(
         MODELS,
@@ -59,6 +62,15 @@ INTEGRATIONS = {
         "Google AI Studio",
         "AIza…",
         icon="brand-google",
+    ),
+    Service.DEEPSEEK: Integration(
+        MODELS,
+        "Modelos DeepSeek para os agentes.",
+        ("DEEPSEEK_API_KEY",),
+        "https://platform.deepseek.com/api_keys",
+        "Plataforma da DeepSeek",
+        "sk-…",
+        logo="deepseek",
     ),
     Service.GITHUB: Integration(
         CODE,

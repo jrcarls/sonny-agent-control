@@ -78,6 +78,7 @@ class Agent(models.Model):
         ANTHROPIC = "anthropic", "Anthropic"
         OPENAI = "openai", "OpenAI"
         GOOGLE = "google", "Google"
+        DEEPSEEK = "deepseek", "DeepSeek"
         OLLAMA = "ollama", "Ollama"
 
     name = models.CharField("nome", max_length=100, unique=True)
@@ -119,6 +120,7 @@ class Credential(models.Model):
         ANTHROPIC = "anthropic", "Anthropic"
         OPENAI = "openai", "OpenAI"
         GOOGLE = "google", "Google"
+        DEEPSEEK = "deepseek", "DeepSeek"
         GITHUB = "github", "GitHub"
 
     service = models.CharField("serviço", max_length=20, choices=Service, unique=True)

@@ -17,11 +17,12 @@ MODEL_PROVIDERS = {
     Provider.ANTHROPIC: "anthropic",
     Provider.OPENAI: "openai",
     Provider.GOOGLE: "google_genai",
+    Provider.DEEPSEEK: "deepseek",
     Provider.OLLAMA: "ollama",
 }
 
 # Provedores que pedem chave de API, cadastrada em Integrações ou no ambiente (Ollama é local, sem chave)
-KEYED_PROVIDERS = [Provider.ANTHROPIC, Provider.OPENAI, Provider.GOOGLE]
+KEYED_PROVIDERS = [Provider.ANTHROPIC, Provider.OPENAI, Provider.GOOGLE, Provider.DEEPSEEK]
 
 # Sugestões do campo "Modelo" usadas quando não dá para consultar o provedor (sem chave, sem rede).
 # É só uma ajuda de digitação: qualquer identificador aceito pelo provedor funciona.
@@ -29,6 +30,7 @@ MODEL_SUGGESTIONS = {
     Provider.ANTHROPIC: ["claude-opus-5-5", "claude-sonnet-5-5", "claude-haiku-5-5", "claude-fable-5-1"],
     Provider.OPENAI: ["gpt-5", "gpt-5-mini", "gpt-4.1"],
     Provider.GOOGLE: ["gemini-3.8-flash", "gemini-3.1-pro-preview", "gemini-3.5-flash-lite", "gemini-flash-latest"],
+    Provider.DEEPSEEK: ["deepseek-chat", "deepseek-reasoner"],
     Provider.OLLAMA: ["llama3.3", "qwen2.5-coder"],
 }
 
@@ -66,6 +68,9 @@ def check_model(provider, model):
 MODEL_LIST_CACHE_SECONDS = 600
 # Trechos de nome que indicam modelo que não serve para conversar com ferramentas (voz, imagem etc.)
 NOT_CHAT = ("tts", "image", "banana", "transcribe", "embedding", "audio", "realtime", "computer-use", "robotics")
+
+
+DEEPSEEK_API_URL = "https://api.deepseek.com"
 
 
 class ModelListError(Exception):
@@ -117,6 +122,16 @@ def _google_models(timeout):
     return sorted(sorted(chat, reverse=True), key=lambda name: not name.startswith("gemini-"))
 
 
+def _deepseek_models(timeout):
+    import openai
+
+    # A API da DeepSeek segue o formato da OpenAI, em outro endereço
+    client = openai.OpenAI(
+        api_key=_api_key(Provider.DEEPSEEK), base_url=DEEPSEEK_API_URL, timeout=timeout, max_retries=0
+    )
+    return sorted(model.id for model in client.models.list() if _is_chat_model(model.id))
+
+
 def _ollama_models(timeout):
     import ollama
 
@@ -127,6 +142,7 @@ _LISTERS = {
     Provider.ANTHROPIC: _anthropic_models,
     Provider.OPENAI: _openai_models,
     Provider.GOOGLE: _google_models,
+    Provider.DEEPSEEK: _deepseek_models,
     Provider.OLLAMA: _ollama_models,
 }
 

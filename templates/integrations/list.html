@@ -23,7 +23,7 @@
                 <section class="border-b border-default last:border-b-0" x-data="{ open: {{ item.open|yesno:'true,false' }}, show: false }">
                     <div class="flex flex-wrap items-center gap-x-4 gap-y-3 p-4 sm:px-5">
                         <span class="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-base bg-neutral-tertiary text-heading" aria-hidden="true">
-                            {% if item.integration.icon %}{% tabler_icon item.integration.icon "h-6 w-6" %}{% else %}<span class="text-base font-semibold">{{ item.service.label|first }}</span>{% endif %}
+                            {% if item.integration.logo %}{% include "brands/"|add:item.integration.logo|add:".svg" %}{% elif item.integration.icon %}{% tabler_icon item.integration.icon "h-6 w-6" %}{% else %}<span class="text-base font-semibold">{{ item.service.label|first }}</span>{% endif %}
                         </span>
                         <div class="min-w-0 flex-1 basis-64">
                             <div class="flex flex-wrap items-center gap-x-2.5 gap-y-1">

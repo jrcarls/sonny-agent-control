@@ -12,7 +12,13 @@ from ..models import Agent, Credential
 from ..workspace import prepare_workspace
 from .base import RunTestCase
 
-NO_KEYS = {"ANTHROPIC_API_KEY": "", "OPENAI_API_KEY": "", "GOOGLE_API_KEY": "", "GEMINI_API_KEY": ""}
+NO_KEYS = {
+    "ANTHROPIC_API_KEY": "",
+    "OPENAI_API_KEY": "",
+    "GOOGLE_API_KEY": "",
+    "GEMINI_API_KEY": "",
+    "DEEPSEEK_API_KEY": "",
+}
 
 
 def store(service, secret):
@@ -63,7 +69,9 @@ class SecretResolutionTests(IntegrationTestCase):
     def test_missing_keys_considers_both_places(self):
         store("openai", "da-tela")
         with mock.patch.dict(os.environ, {"ANTHROPIC_API_KEY": "a"}):
-            self.assertEqual(providers.missing_api_keys(), {"google": "GOOGLE_API_KEY"})
+            self.assertEqual(
+                providers.missing_api_keys(), {"google": "GOOGLE_API_KEY", "deepseek": "DEEPSEEK_API_KEY"}
+            )
 
     def test_agent_model_gets_the_stored_key(self):
         agent = Agent(name="Revisor", provider="anthropic", model="claude-sonnet-5-5")
@@ -97,14 +105,17 @@ class IntegrationScreenTests(IntegrationTestCase):
             page = self.client.get(self.list_url)
         self.assertEqual(
             [(item["service"].value, item["source"]) for item in page.context["integrations"]],
-            [("anthropic", "environment"), ("openai", "stored"), ("google", ""), ("github", "")],
+            [("anthropic", "environment"), ("openai", "stored"), ("google", ""), ("deepseek", ""), ("github", "")],
         )
         self.assertContains(page, "••••9876")
         self.assertContains(page, "ANTHROPIC_API_KEY</code> do servidor")
         self.assertContains(page, "Conectada", count=2)
-        self.assertContains(page, "Não configurada", count=2)
+        self.assertContains(page, "Não configurada", count=3)
         self.assertContains(page, ">Provedores de modelo</h2>")
         self.assertContains(page, ">Código</h2>")
+        # Cada serviço aparece com a própria marca: logo do projeto ou ícone do Tabler, nunca só a inicial
+        self.assertContains(page, 'viewBox="0 0 24 24" fill="currentColor"', count=2)
+        self.assertNotContains(page, '<span class="text-base font-semibold">')
         # Nenhuma chave vai para a página, nem a salva nem a do ambiente
         self.assertNotContains(page, "sk-proj-abcdefgh")
         self.assertNotContains(page, "sk-ant-do-ambiente")
@@ -122,7 +133,10 @@ class IntegrationScreenTests(IntegrationTestCase):
         self.assertEqual(page.redirect_chain[0][0], f"{self.list_url}?verificar=anthropic")
         self.assertContains(page, 'hx-trigger="load"', count=1)
         opened = {item["service"].value: item["open"] for item in page.context["integrations"]}
-        self.assertEqual(opened, {"anthropic": True, "openai": False, "google": False, "github": False})
+        self.assertEqual(
+            opened,
+            {"anthropic": True, "openai": False, "google": False, "deepseek": False, "github": False},
+        )
         self.assertNotContains(page, "sk-ant-api03")
 
     def test_saving_again_replaces_the_key_and_drops_the_cached_model_list(self):
@@ -181,7 +195,7 @@ class IntegrationScreenTests(IntegrationTestCase):
     def test_agent_form_warning_links_here(self):
         page = self.client.get(reverse("orchestrator:agent_create"))
         self.assertContains(page, f'href="{self.list_url}"')
-        store("anthropic", "a"), store("openai", "o"), store("google", "g")
+        store("anthropic", "a"), store("openai", "o"), store("google", "g"), store("deepseek", "d")
         self.assertNotContains(self.client.get(reverse("orchestrator:agent_create")), "está sem chave")
 
 

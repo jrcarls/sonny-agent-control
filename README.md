@@ -9,7 +9,7 @@ podem ler e alterar o código em um worktree Git isolado, delegar partes do trab
 requests; as ações sensíveis esperam a aprovação de uma pessoa.
 
 Feito com Django, Celery e LangGraph. Cada agente usa o provedor e o modelo do próprio cadastro
-(Anthropic, OpenAI, Google ou Ollama).
+(Anthropic, OpenAI, Google, DeepSeek ou Ollama).
 
 ## Recursos
 
@@ -90,7 +90,7 @@ Quase tudo vem de variáveis de ambiente, lidas do `.env`. As principais:
 
 | Variável | Para que serve |
 |---|---|
-| `ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, `GOOGLE_API_KEY` | Chave de cada provedor de LLM usado pelos agentes |
+| `ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, `GOOGLE_API_KEY`, `DEEPSEEK_API_KEY` | Chave de cada provedor de LLM usado pelos agentes |
 | `GITHUB_TOKEN` | Opcional: abrir pull requests pela API do GitHub (veja "Acesso aos repositórios") |
 | `DATABASE_URL`, `CELERY_BROKER_URL` | Postgres e Redis (o padrão aponta para o `docker compose`) |
 | `CELERY_WORKER_CONCURRENCY` | Quantas execuções rodam ao mesmo tempo (padrão 2) |

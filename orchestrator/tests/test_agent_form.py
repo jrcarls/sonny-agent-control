@@ -81,7 +81,12 @@ class AgentFormLayoutTests(AgentFormTestCase):
 
 class MissingKeyWarningTests(AgentFormTestCase):
     def test_warns_only_for_providers_without_a_key(self):
-        environment = {"ANTHROPIC_API_KEY": "sk-teste", "OPENAI_API_KEY": "", "GEMINI_API_KEY": "chave"}
+        environment = {
+            "ANTHROPIC_API_KEY": "sk-teste",
+            "OPENAI_API_KEY": "",
+            "GEMINI_API_KEY": "chave",
+            "DEEPSEEK_API_KEY": "sk-deep",
+        }
         with mock.patch.dict(os.environ, environment):
             os.environ.pop("GOOGLE_API_KEY", None)
             self.assertEqual(providers.missing_api_keys(), {"openai": "OPENAI_API_KEY"})
@@ -161,6 +166,12 @@ class ListModelsTests(TestCase):
         with mock.patch("openai.OpenAI") as client:
             client.return_value.models.list.return_value = fake_models(*names)
             self.assertEqual(providers.list_models("openai"), ["o4-mini", "gpt-5-mini", "gpt-5"])
+
+    def test_deepseek_lists_through_the_openai_client_at_its_own_address(self):
+        with mock.patch.dict(os.environ, {"DEEPSEEK_API_KEY": "d"}), mock.patch("openai.OpenAI") as client:
+            client.return_value.models.list.return_value = fake_models("deepseek-reasoner", "deepseek-chat")
+            self.assertEqual(providers.list_models("deepseek"), ["deepseek-chat", "deepseek-reasoner"])
+        client.assert_called_once_with(api_key="d", base_url="https://api.deepseek.com", timeout=10, max_retries=0)
 
     def test_google_keeps_only_text_models_that_generate_content(self):
         models = [
