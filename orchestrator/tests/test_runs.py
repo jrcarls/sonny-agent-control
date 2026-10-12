@@ -55,6 +55,26 @@ class ExecuteRunTests(RunTestCase):
         )
         self.assertIsNone(model.bound_tools)  # agente sem ferramentas só conversa
 
+    def test_empty_answer_is_asked_again_and_the_tokens_of_both_calls_count(self):
+        empty = AIMessage(content="", usage_metadata={"input_tokens": 10, "output_tokens": 0, "total_tokens": 10})
+        full = AIMessage(content="Agora sim.", usage_metadata={"input_tokens": 12, "output_tokens": 3, "total_tokens": 15})
+        run = self.make_run()
+        model = self.execute(run, empty, full)
+        self.assertEqual((run.status, run.result), (Run.Status.SUCCEEDED, "Agora sim."))
+        self.assertEqual((run.input_tokens, run.output_tokens), (22, 3))
+        # A resposta vazia não entra na conversa
+        self.assertEqual(model.calls[0], model.calls[1])
+
+    def test_answer_that_stays_empty_fails_the_run_and_can_be_resumed(self):
+        run = self.make_run()
+        self.execute(run, AIMessage(content=""), AIMessage(content=""))
+        self.assertEqual((run.status, run.result), (Run.Status.FAILED, ""))
+        self.assertIn("EmptyResponseError: o modelo devolveu uma resposta vazia", run.events.get(kind="error").content)
+        with mock.patch.object(tasks.execute_run, "delay"), self.captureOnCommitCallbacks(execute=True):
+            self.client.post(reverse("orchestrator:run_resume", args=[run.pk]))
+        self.execute(run, AIMessage(content="Pronto."))
+        self.assertEqual((run.status, run.result), (Run.Status.SUCCEEDED, "Pronto."))
+
     def test_agent_receives_instructions_project_and_task(self):
         run = self.make_run()
         model = self.execute(run, AIMessage(content="ok"))

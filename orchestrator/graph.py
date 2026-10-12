@@ -22,6 +22,14 @@ DELEGATE_TOOL = "delegate_task"
 USAGE = "usage"
 
 
+# Quantas vezes o agente principal é chamado de novo quando o modelo devolve uma resposta vazia
+EMPTY_RESPONSE_RETRIES = 1
+
+
+class EmptyResponseError(Exception):
+    """O modelo do agente principal não devolveu texto nem pedido de ferramenta."""
+
+
 class Frame(TypedDict):
     """Um agente em atividade: o do topo da pilha trabalha, os de baixo esperam por ele."""
 
@@ -137,7 +145,18 @@ def build_graph(run, workspace, checkpointer):
         agent = agents[frame["agent_id"]]
         caller = agents[frames[-2]["agent_id"]] if len(frames) > 1 else None
         system = SystemMessage(_system_prompt(run, agent, skills[agent.pk], delegates[agent.pk], caller))
-        response = model_for(agent).invoke([system, *frame["messages"]])
+        usages = []
+        for _ in range(1 + EMPTY_RESPONSE_RETRIES):
+            response = model_for(agent).invoke([system, *frame["messages"]])
+            usages.append(response.usage_metadata or {})
+            # Alguns modelos às vezes devolvem uma resposta sem nada. No agente principal isso encerraria
+            # a execução como concluída e sem resultado, então ele é chamado de novo.
+            if response.text or response.tool_calls or caller:
+                break
+        else:
+            raise EmptyResponseError(
+                "o modelo devolveu uma resposta vazia mais de uma vez. Use “Continuar de onde parou” para tentar de novo."
+            )
         frame["messages"].append(response)
 
         log = []
@@ -148,8 +167,8 @@ def build_graph(run, workspace, checkpointer):
                 arguments = json.dumps(call["args"], ensure_ascii=False, indent=2)
                 log.append(_entry(RunEvent.Kind.TOOL_CALL, agent, f"{call['name']}\n{arguments}"))
         # Por último: se o limite de tokens estourar, a resposta do agente já ficou registrada
-        usage = response.usage_metadata or {}
-        log.append({"kind": USAGE, "input": usage.get("input_tokens", 0), "output": usage.get("output_tokens", 0)})
+        for usage in usages:
+            log.append({"kind": USAGE, "input": usage.get("input_tokens", 0), "output": usage.get("output_tokens", 0)})
         return {"frames": frames, "log": log}
 
     def after_work(state: State):
