@@ -7,13 +7,40 @@
 <div class="py-6">
     <h1 class="mb-4 text-2xl font-semibold tracking-tight text-heading">Execuções</h1>
     <c-tabs label="Filtrar por situação">
-        <c-tab href="{% url 'orchestrator:run_list' %}" active="{% if not situacao %}1{% endif %}">Todas</c-tab>
-        <c-tab href="{% url 'orchestrator:run_list' %}?situacao=ativas" active="{% if situacao == 'ativas' %}1{% endif %}">Em andamento</c-tab>
-        <c-tab href="{% url 'orchestrator:run_list' %}?situacao=finalizadas" active="{% if situacao == 'finalizadas' %}1{% endif %}">Finalizadas</c-tab>
+        {% for tab in tabs %}<c-tab href="{{ tab.href }}" active="{% if tab.active %}1{% endif %}">{{ tab.label }}</c-tab>{% endfor %}
     </c-tabs>
+
+    {# Os filtros valem junto com a aba de situação; escolher um projeto ou agente já envia #}
+    <form method="get" class="mb-4 flex flex-wrap items-center gap-3">
+        {% if filters.situacao %}<input type="hidden" name="situacao" value="{{ filters.situacao }}">{% endif %}
+        <div class="relative w-full sm:w-72">
+            <label for="filter-q" class="sr-only">Buscar na tarefa</label>
+            <span class="pointer-events-none absolute inset-y-0 start-0 flex items-center ps-3 text-body">{% tabler_icon "search" "h-4 w-4" %}</span>
+            <c-input type="search" name="q" id="filter-q" value="{{ filters.q }}" placeholder="Buscar na tarefa" class="ps-9" />
+        </div>
+        <div>
+            <label for="filter-project" class="sr-only">Projeto</label>
+            <c-input as="select" name="projeto" id="filter-project" onchange="this.form.submit()">
+                <option value="">Todos os projetos</option>
+                {% for project in projects %}<option value="{{ project.pk }}" {% if filters.projeto == project.pk|stringformat:"s" %}selected{% endif %}>{{ project.name }}</option>{% endfor %}
+            </c-input>
+        </div>
+        <div>
+            <label for="filter-agent" class="sr-only">Agente</label>
+            <c-input as="select" name="agente" id="filter-agent" onchange="this.form.submit()">
+                <option value="">Todos os agentes</option>
+                {% for agent in agents %}<option value="{{ agent.pk }}" {% if filters.agente == agent.pk|stringformat:"s" %}selected{% endif %}>{{ agent.name }}</option>{% endfor %}
+            </c-input>
+        </div>
+        <c-button variant="secondary" type="submit">Filtrar</c-button>
+        {% if filtered %}<a href="{% url 'orchestrator:run_list' %}{% if filters.situacao %}?situacao={{ filters.situacao }}{% endif %}" class="text-sm font-medium text-fg-brand hover:underline">Limpar filtros</a>{% endif %}
+    </form>
+
     {% if runs %}
         {% include "runs/_table.html" with runs=runs %}
-        {% if is_paginated %}<c-pagination :page_obj="page_obj" query="situacao={{ situacao }}" />{% endif %}
+        {% if is_paginated %}<c-pagination :page_obj="page_obj" query="{{ query }}" />{% endif %}
+    {% elif filtered %}
+        <c-empty-state icon="filter-off" title="Nenhuma execução com esses filtros">Mude a busca ou <a href="{% url 'orchestrator:run_list' %}" class="font-medium text-fg-brand hover:underline">veja todas</a>.</c-empty-state>
     {% else %}
         <c-empty-state icon="history" title="Nenhuma execução aqui">Envie uma tarefa pela <a href="{% url 'home' %}" class="font-medium text-fg-brand hover:underline">visão geral</a>.</c-empty-state>
     {% endif %}

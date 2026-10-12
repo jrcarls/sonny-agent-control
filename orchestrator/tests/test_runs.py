@@ -117,6 +117,71 @@ class RunViewTests(RunTestCase):
         self.assertEqual(listed(situacao="ativas"), {"tarefa ativa", "tarefa esperando"})
         self.assertEqual(listed(situacao="finalizadas"), {"tarefa pronta"})
 
+    def test_list_filters_by_project_agent_and_text_together_with_the_situation(self):
+        from ..models import Agent
+
+        api = Project.objects.create(name="API", repo_url="git@github.com:org/api.git")
+        coder = Agent.objects.create(name="Programador", provider="openai", model="m")
+        self.make_run(prompt="Corrigir o login")
+        self.make_run(prompt="Corrigir o cadastro", project=api, status=Run.Status.SUCCEEDED)
+        self.make_run(prompt="Escrever testes", project=api, agent=coder)
+        url = reverse("orchestrator:run_list")
+
+        def listed(**params):
+            return {run.prompt for run in self.client.get(url, params).context["runs"]}
+
+        self.assertEqual(listed(projeto=api.pk), {"Corrigir o cadastro", "Escrever testes"})
+        self.assertEqual(listed(agente=coder.pk), {"Escrever testes"})
+        self.assertEqual(listed(q="corrigir"), {"Corrigir o login", "Corrigir o cadastro"})
+        self.assertEqual(listed(q="corrigir", projeto=api.pk, situacao="finalizadas"), {"Corrigir o cadastro"})
+        self.assertEqual(len(listed(projeto="abc", agente="", situacao="nope")), 3)  # valores inválidos são ignorados
+
+        page = self.client.get(url, {"projeto": api.pk, "q": "corrigir", "situacao": "ativas"})
+        self.assertContains(page, "Nenhuma execução com esses filtros")
+        self.assertContains(page, f'<option value="{api.pk}" selected>API</option>', html=True)
+        self.assertContains(page, "Limpar filtros")
+        # As abas mantêm o projeto e a busca
+        self.assertEqual(
+            [tab["href"] for tab in page.context["tabs"]],
+            [f"{url}?projeto={api.pk}&q=corrigir", f"{url}?projeto={api.pk}&q=corrigir&situacao=ativas",
+             f"{url}?projeto={api.pk}&q=corrigir&situacao=finalizadas"],
+        )
+        self.assertEqual(page.context["query"], f"situacao=ativas&projeto={api.pk}&q=corrigir")
+        self.assertNotContains(self.client.get(url), "Limpar filtros")
+        self.assertEqual(self.client.get(url).context["tabs"][0]["href"], url)
+
+    def test_list_shows_duration_tokens_autonomy_and_pull_request(self):
+        from datetime import timedelta
+
+        from django.utils import timezone
+
+        start = timezone.now() - timedelta(hours=2)
+        self.make_run(
+            status=Run.Status.SUCCEEDED,
+            started_at=start,
+            finished_at=start + timedelta(minutes=3, seconds=5),
+            input_tokens=12_000,
+            output_tokens=345,
+            autonomous=True,
+            pull_request_url="https://github.com/org/site/pull/7",
+        )
+        page = self.client.get(reverse("orchestrator:run_list"))
+        self.assertContains(page, "3 min 05 s")
+        self.assertContains(page, "12.345")
+        self.assertContains(page, ">Autônomo</span>")
+        self.assertContains(page, 'href="https://github.com/org/site/pull/7"')
+
+    def test_duration_format(self):
+        from datetime import timedelta
+
+        from ..templatetags.formatting import duration
+
+        cases = {0: "0 s", 42: "42 s", 60: "1 min 00 s", 3599: "59 min 59 s", 4320: "1 h 12 min"}
+        for seconds, text in cases.items():
+            self.assertEqual(duration(timedelta(seconds=seconds)), text)
+        self.assertEqual(duration(None), "")
+        self.assertIsNone(self.make_run().duration)
+
     def test_list_is_paginated_and_keeps_the_filter(self):
         Run.objects.bulk_create(
             Run(project=self.project, agent=self.agent, prompt=f"tarefa {number}", created_by=self.user)

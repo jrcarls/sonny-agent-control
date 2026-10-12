@@ -11,6 +11,7 @@ from django.db.models.functions import Coalesce
 from django.http import Http404
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse, reverse_lazy
+from django.utils.http import urlencode
 from django.utils import timezone
 from django.views import View
 from django_htmx.http import HttpResponseClientRedirect
@@ -522,17 +523,62 @@ class RunListView(LoginRequiredMixin, ListView):
     template_name = "runs/list.html"
     context_object_name = "runs"
     paginate_by = PAGE_SIZE
-    FILTERS = {
-        "ativas": {"status__in": Run.ACTIVE_STATUSES},
-        "finalizadas": {"status__in": [Run.Status.SUCCEEDED, Run.Status.FAILED, Run.Status.CANCELED]},
+    # Abas de situação: valor de ?situacao= -> (rótulo, filtro)
+    SITUATIONS = {
+        "": ("Todas", {}),
+        "ativas": ("Em andamento", {"status__in": Run.ACTIVE_STATUSES}),
+        "finalizadas": (
+            "Finalizadas",
+            {"status__in": [Run.Status.SUCCEEDED, Run.Status.FAILED, Run.Status.CANCELED]},
+        ),
     }
 
+    def get_filters(self):
+        """Filtros pedidos na URL, já conferidos: situação, projeto, agente e texto da tarefa."""
+        params = self.request.GET
+        situation = params.get("situacao", "")
+        return {
+            "situacao": situation if situation in self.SITUATIONS else "",
+            "projeto": params.get("projeto", "") if params.get("projeto", "").isdigit() else "",
+            "agente": params.get("agente", "") if params.get("agente", "").isdigit() else "",
+            "q": params.get("q", "").strip(),
+        }
+
     def get_queryset(self):
+        filters = self.get_filters()
         queryset = super().get_queryset().select_related("project", "agent")
-        return queryset.filter(**self.FILTERS.get(self.request.GET.get("situacao"), {}))
+        queryset = queryset.filter(**self.SITUATIONS[filters["situacao"]][1])
+        if filters["projeto"]:
+            queryset = queryset.filter(project_id=filters["projeto"])
+        if filters["agente"]:
+            queryset = queryset.filter(agent_id=filters["agente"])
+        if filters["q"]:
+            queryset = queryset.filter(prompt__icontains=filters["q"])
+        return queryset
 
     def get_context_data(self, **kwargs):
-        return super().get_context_data(**kwargs, situacao=self.request.GET.get("situacao", ""))
+        filters = self.get_filters()
+        url = reverse("orchestrator:run_list")
+        # As abas trocam só a situação e mantêm os outros filtros
+        others = {name: value for name, value in filters.items() if value and name != "situacao"}
+        tabs = [
+            {
+                "label": label,
+                "href": f"{url}?{urlencode(others | ({'situacao': value} if value else {}))}".rstrip("?"),
+                "active": value == filters["situacao"],
+            }
+            for value, (label, _) in self.SITUATIONS.items()
+        ]
+        return super().get_context_data(
+            **kwargs,
+            filters=filters,
+            filtered=bool(others),
+            tabs=tabs,
+            # Parâmetros que a paginação precisa manter ao trocar de página
+            query=urlencode({name: value for name, value in filters.items() if value}),
+            projects=Project.objects.all(),
+            agents=Agent.objects.all(),
+        )
 
 
 def can_resume(run):
@@ -656,9 +702,11 @@ class RunFollowUpView(LoginRequiredMixin, View):
             else:
                 run.follow_up = message
                 run.status = Run.Status.QUEUED
+                # O relógio recomeça: a duração mostrada passa a ser a deste ajuste, sem o tempo parado
+                run.started_at = None
                 run.finished_at = None
                 run.cancel_requested = False
-                run.save(update_fields=["follow_up", "status", "finished_at", "cancel_requested"])
+                run.save(update_fields=["follow_up", "status", "started_at", "finished_at", "cancel_requested"])
                 run.events.create(kind=RunEvent.Kind.NOTE, content=message[:MAX_EVENT_LENGTH])
                 enqueue(run, f"{request.user.get_username()} pediu um ajuste; a execução voltou para a fila.")
         return redirect(run)

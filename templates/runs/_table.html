@@ -1,3 +1,4 @@
+{% load formatting tabler_icons %}
 {# Tabela de execuções. Uso: {% include "runs/_table.html" with runs=runs %} #}
 <div class="overflow-x-auto rounded-base border border-default bg-neutral-primary-soft shadow-xs">
     <table class="w-full text-left text-sm text-body">
@@ -7,6 +8,8 @@
                 <th scope="col" class="px-6 py-3 font-medium">Projeto</th>
                 <th scope="col" class="px-6 py-3 font-medium">Agente</th>
                 <th scope="col" class="px-6 py-3 font-medium">Situação</th>
+                <th scope="col" class="px-6 py-3 text-right font-medium">Duração</th>
+                <th scope="col" class="px-6 py-3 text-right font-medium">Tokens</th>
                 <th scope="col" class="px-6 py-3 font-medium">Criada em</th>
             </tr>
         </thead>
@@ -15,10 +18,18 @@
                 <tr class="border-b border-default last:border-0">
                     <th scope="row" class="max-w-xl px-6 py-4 font-medium text-heading">
                         <a href="{{ run.get_absolute_url }}" class="block truncate hover:underline">{{ run.prompt|truncatechars:80 }}</a>
+                        {% if run.autonomous or run.pull_request_url %}
+                            <span class="mt-1 flex flex-wrap items-center gap-2 text-xs font-normal">
+                                {% if run.autonomous %}<span class="rounded bg-warning-soft px-1.5 py-0.5 font-medium text-fg-warning" title="As ações sensíveis rodaram sem pedir aprovação">Autônomo</span>{% endif %}
+                                {% if run.pull_request_url %}<a href="{{ run.pull_request_url }}" target="_blank" rel="noopener" class="inline-flex items-center font-medium text-fg-brand hover:underline">{% tabler_icon "git-pull-request" "me-1 h-3.5 w-3.5" %}Pull request</a>{% endif %}
+                            </span>
+                        {% endif %}
                     </th>
                     <td class="px-6 py-4">{{ run.project.name }}</td>
                     <td class="px-6 py-4">{{ run.agent.name }}</td>
                     <td class="px-6 py-4">{% include "runs/_status_badge.html" with run=run %}</td>
+                    <td class="whitespace-nowrap px-6 py-4 text-right tabular-nums">{{ run.duration|duration|default:"—" }}</td>
+                    <td class="whitespace-nowrap px-6 py-4 text-right tabular-nums">{% if run.total_tokens %}{{ run.total_tokens|floatformat:"0g" }}{% else %}—{% endif %}</td>
                     <td class="whitespace-nowrap px-6 py-4">{{ run.created_at|date:"d/m/Y H:i" }}</td>
                 </tr>
             {% endfor %}

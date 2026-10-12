@@ -206,6 +206,13 @@ class Run(models.Model):
         return self.status in [self.Status.QUEUED, self.Status.RUNNING]
 
     @property
+    def duration(self):
+        """Tempo de trabalho: do início até o fim, ou até agora se ainda não terminou. None se nem começou."""
+        if self.started_at is None:
+            return None
+        return (self.finished_at or timezone.now()) - self.started_at
+
+    @property
     def branch(self):
         return f"sonny/run-{self.pk}"
 
