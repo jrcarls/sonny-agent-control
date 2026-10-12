@@ -62,6 +62,18 @@ class SidebarTests(RunTestCase):
         self.assertEqual(response.context["sidebar"]["section"], "runs")
         self.assertContains(response, 'aria-current="page"', count=2)  # o item Execuções e a execução na lista
 
+    def test_menu_carries_what_the_tab_title_and_browser_alerts_need(self):
+        run = self.make_run(prompt="Rodar os testes", status=Run.Status.WAITING)
+        Approval.objects.create(run=run, tool_call_id="c1", tool_name="run_command", tool_args={})
+        page = self.client.get(reverse("home"))
+        self.assertContains(page, 'data-pending-approvals="1"')
+        self.assertContains(page, f'data-approvals-url="{reverse("orchestrator:approval_list")}"')
+        self.assertContains(
+            page, f'data-run-id="{run.pk}" data-run-status="waiting_approval" data-run-title="Rodar os testes"'
+        )
+        self.assertContains(page, "js/notify.js")
+        self.assertContains(page, "Ativar avisos do navegador")
+
     def test_user_menu_items(self):
         page = self.client.get(reverse("home"))
         for label in ["Integrações", "Modo escuro", "Sair"]:

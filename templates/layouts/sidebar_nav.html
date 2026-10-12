@@ -1,6 +1,8 @@
 {% load tabler_icons %}
 {# Menu da sidebar. Depende do estado das execuções, por isso o htmx o busca de novo a cada 10s. #}
-<nav id="sidebar-nav" hx-get="{% url 'orchestrator:sidebar' %}" hx-trigger="every 10s" hx-swap="outerHTML">
+{# Os atributos data-* alimentam o notify.js: contador no título da aba e avisos do navegador. #}
+<nav id="sidebar-nav" hx-get="{% url 'orchestrator:sidebar' %}" hx-trigger="every 10s" hx-swap="outerHTML"
+     data-pending-approvals="{{ sidebar.pending_approvals }}" data-approvals-url="{% url 'orchestrator:approval_list' %}">
     <a href="{% url 'home' %}" title="Nova tarefa"
        class="flex items-center justify-center px-2 py-2 mb-4 text-sm font-semibold leading-5 text-white rounded-lg bg-primary-700 hover:bg-primary-800 focus:ring-4 focus:ring-primary-300 focus:outline-none dark:bg-primary-600 dark:hover:bg-primary-700 dark:focus:ring-primary-800">
         {% tabler_icon "plus" "shrink-0 w-5 h-5" %}
@@ -78,7 +80,8 @@
             <ul class="space-y-0.5">
                 {% for run in sidebar.recent_runs %}
                     <li>
-                        <a href="{{ run.get_absolute_url }}" title="{{ run.get_status_display }}: {{ run.prompt|truncatechars:200 }}" {% if run.get_absolute_url == sidebar.path %}aria-current="page"{% endif %}
+                        <a href="{{ run.get_absolute_url }}" title="{{ run.get_status_display }}: {{ run.prompt|truncatechars:200 }}"
+                           data-run-id="{{ run.pk }}" data-run-status="{{ run.status }}" data-run-title="{{ run.prompt|truncatechars:120 }}" {% if run.get_absolute_url == sidebar.path %}aria-current="page"{% endif %}
                            class="flex items-center px-2 py-1.5 text-[0.8125rem] leading-5 rounded-lg {% if run.get_absolute_url == sidebar.path %}bg-gray-100 font-medium text-gray-900 dark:bg-gray-700 dark:text-white{% else %}text-gray-500 hover:bg-gray-100 hover:text-gray-900 dark:text-gray-400 dark:hover:bg-gray-700 dark:hover:text-white{% endif %}">
                             <span class="shrink-0 h-2 w-2 rounded-full {% if run.status == "running" %}animate-pulse bg-primary-500{% elif run.status == "waiting_approval" %}bg-amber-500{% elif run.status == "succeeded" %}bg-green-500{% elif run.status == "failed" or run.status == "canceled" %}bg-red-500{% elif run.status == "queued" %}bg-yellow-400{% else %}bg-gray-300 dark:bg-gray-500{% endif %}"></span>
                             <span class="ml-2.5 truncate">{{ run.prompt|truncatechars:60 }}</span>

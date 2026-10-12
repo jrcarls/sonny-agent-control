@@ -15,6 +15,11 @@
 <aside id="default-sidebar" class="fixed top-0 left-0 z-40 w-64 h-screen transition-[width,translate] -translate-x-full sm:translate-x-0 sm:sidebar-collapsed:w-16" aria-label="Menu principal"
        x-data="{
          collapsed: document.documentElement.classList.contains('sidebar-collapsed'),
+         // Permissão dos avisos do navegador: default (ainda não pedida), granted, denied ou unsupported
+         notifications: 'Notification' in window ? Notification.permission : 'unsupported',
+         askNotifications() {
+           Notification.requestPermission().then(permission => this.notifications = permission);
+         },
          toggleTheme() {
            const dark = document.documentElement.classList.toggle('dark');
            try { localStorage.setItem('theme', dark ? 'dark' : 'light') } catch (e) {}
@@ -70,6 +75,14 @@
               {% tabler_icon "sun" "hidden mr-2 w-5 h-5 text-gray-400 dark:block" %}
               <span class="dark:hidden">Modo escuro</span>
               <span class="hidden dark:inline">Modo claro</span>
+            </button>
+          </li>
+          <li x-show="notifications !== 'unsupported'">
+            <button type="button" @click="askNotifications()" x-bind:disabled="notifications !== 'default'"
+                    title="Avisa quando uma execução termina ou espera aprovação e esta aba está em segundo plano"
+                    class="flex items-center py-2 px-4 w-full text-sm text-left text-gray-700 enabled:cursor-pointer enabled:hover:bg-gray-100 disabled:text-gray-400 dark:text-gray-300 dark:enabled:hover:bg-gray-600 dark:enabled:hover:text-white dark:disabled:text-gray-500" role="menuitem">
+              {% tabler_icon "bell" "mr-2 w-5 h-5 text-gray-400" %}
+              <span x-text="notifications === 'granted' ? 'Avisos do navegador ativados' : notifications === 'denied' ? 'Avisos bloqueados no navegador' : 'Ativar avisos do navegador'">Ativar avisos do navegador</span>
             </button>
           </li>
         </ul>
