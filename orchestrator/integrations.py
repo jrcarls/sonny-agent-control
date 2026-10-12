@@ -74,13 +74,14 @@ INTEGRATIONS = {
     ),
     Service.GITHUB: Integration(
         CODE,
-        "Abre os pull requests dos agentes. Sem o token, o agente envia a branch e entrega o link para você abrir.",
+        "Abre os pull requests dos agentes e dá acesso aos repositórios de endereço https. "
+        "Sem o token, o agente envia a branch e entrega o link para você abrir.",
         ("GITHUB_TOKEN",),
         "https://github.com/settings/tokens",
         "Tokens do GitHub",
         "ghp_… ou github_pat_…",
         icon="brand-github",
-        help="Permissão necessária: escrita em pull requests (ou o escopo repo, em um token clássico).",
+        help="Permissões necessárias: escrita em pull requests e em conteúdo (ou o escopo repo, em um token clássico).",
     ),
 }
 

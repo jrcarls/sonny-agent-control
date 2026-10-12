@@ -114,9 +114,8 @@ SSH (`git@github.com:organizacao/repositorio.git`) no projeto. O botão "Testar 
 A chave privada fica no banco, criptografada com a `SECRET_KEY`: se a `SECRET_KEY` mudar, gere chaves novas.
 
 O token do GitHub é opcional. Com ele, na tela de Integrações ou no `GITHUB_TOKEN`, os agentes abrem o pull
-request sozinhos. Só a variável `GITHUB_TOKEN` faz os endereços `https` do GitHub funcionarem em repositórios
-privados, porque ela é aplicada ao git quando o container sobe. Sem token, o agente envia a branch e entrega
-o link para você abrir o pull request.
+request sozinhos, e os projetos com endereço `https` do GitHub passam a clonar e enviar branches com ele, sem
+precisar da chave SSH. Sem token, o agente envia a branch e entrega o link para você abrir o pull request.
 
 ## Como funciona
 

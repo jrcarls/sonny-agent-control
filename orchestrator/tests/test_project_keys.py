@@ -1,3 +1,4 @@
+import base64
 import stat
 from unittest import mock
 
@@ -7,7 +8,7 @@ from django.urls import reverse
 from django.utils import timezone
 
 from .. import crypto, workspace
-from ..models import Project, Run
+from ..models import Credential, Project, Run
 from .base import RunTestCase
 
 HTMX = {"HX-Request": "true"}
@@ -66,6 +67,24 @@ class ProjectKeyTests(RunTestCase):
         modal = self.client.get(self.project.get_absolute_url(), headers=HTMX)
         self.assertContains(modal, self.project.ssh_public_key)
 
+    def test_https_github_address_uses_the_token_saved_in_integrations(self):
+        credential = Credential(service="github")
+        credential.set_secret("ghp_segredo")
+        credential.save()
+        with mock.patch.object(workspace.subprocess, "run") as run:
+            run.return_value = mock.Mock(returncode=0, stdout="", stderr="")
+            # O endereço local dos testes não é do GitHub: o token não acompanha
+            workspace.git("fetch", "origin", cwd=self.tmp, project=self.project)
+            self.assertNotIn("GIT_CONFIG_COUNT", run.call_args.kwargs["env"])
+            self.project.repo_url = "https://github.com/org/site.git"
+            workspace.git("push", "origin", "HEAD", cwd=self.tmp, project=self.project)
+            env = run.call_args.kwargs["env"]
+        self.assertEqual(env["GIT_CONFIG_KEY_0"], "http.https://github.com/.extraheader")
+        header = base64.b64encode(b"x-access-token:ghp_segredo").decode()
+        self.assertEqual(env["GIT_CONFIG_VALUE_0"], f"Authorization: Basic {header}")
+        # Fica só no ambiente do comando, nunca nos argumentos
+        self.assertNotIn("ghp_segredo", " ".join(run.call_args.args[0]))
+
     def test_git_uses_the_project_key_from_a_private_file(self):
         with mock.patch.object(workspace.subprocess, "run") as run:
             run.return_value = mock.Mock(returncode=0, stdout="", stderr="")
@@ -73,6 +92,7 @@ class ProjectKeyTests(RunTestCase):
             command = run.call_args.kwargs["env"]["GIT_SSH_COMMAND"]
             workspace.git("status", cwd=self.tmp)
             self.assertNotIn("GIT_SSH_COMMAND", run.call_args.kwargs["env"])
+            self.assertNotIn("GIT_CONFIG_COUNT", run.call_args.kwargs["env"])
         key_file = self.tmp / "workspaces" / "keys" / str(self.project.pk)
         self.assertIn(f"-i {key_file}", command)
         self.assertIn("IdentitiesOnly=yes", command)

@@ -1,5 +1,6 @@
 """Área de trabalho de uma execução: um worktree git próprio, isolado das outras execuções."""
 
+import base64
 import fcntl
 import os
 import shlex
@@ -38,6 +39,29 @@ def _ssh_key_file(project):
     return path
 
 
+GITHUB_HTTPS = "https://github.com/"
+
+
+def _github_token_config(project):
+    """Variáveis que fazem o git usar o token de Integrações nos endereços https do GitHub.
+
+    Vai num cabeçalho só deste comando: o token não entra no endereço, no .git/config nem nas mensagens de erro.
+    """
+    if not project.repo_url.startswith(GITHUB_HTTPS):
+        return {}
+    from .integrations import Service, stored_secrets  # import local: integrations depende de models
+
+    token = stored_secrets().get(Service.GITHUB)
+    if not token:
+        return {}
+    basic = base64.b64encode(f"x-access-token:{token}".encode()).decode()
+    return {
+        "GIT_CONFIG_COUNT": "1",
+        "GIT_CONFIG_KEY_0": f"http.{GITHUB_HTTPS}.extraheader",
+        "GIT_CONFIG_VALUE_0": f"Authorization: Basic {basic}",
+    }
+
+
 def _git_env(project):
     # GIT_TERMINAL_PROMPT=0 e BatchMode: sem credencial o git falha em vez de ficar esperando digitação
     env = {**os.environ, "GIT_TERMINAL_PROMPT": "0"}
@@ -49,6 +73,7 @@ def _git_env(project):
             f"ssh -i {shlex.quote(str(_ssh_key_file(project)))} -o IdentitiesOnly=yes -o BatchMode=yes "
             f"-o StrictHostKeyChecking=accept-new -o UserKnownHostsFile={shlex.quote(str(known_hosts))}"
         )
+        env.update(_github_token_config(project))
     return env
 
 
