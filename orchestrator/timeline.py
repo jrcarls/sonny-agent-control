@@ -14,7 +14,13 @@ SUMMARIES = {
     "list_files": ("Listou", "path"),
     "read_file": ("Leu", "path"),
     "search_files": ("Buscou", "pattern"),
+    "find_files": ("Procurou", "pattern"),
+    "git_status": ("Viu a situação do git", ""),
+    "git_diff": ("Viu o diff", "revision"),
+    "git_log": ("Viu o histórico", "path"),
+    "list_pull_requests": ("Listou pull requests", "state"),
     "write_file": ("Escreveu", "path"),
+    "edit_file": ("Editou", "path"),
     "run_command": ("Rodou", "command"),
     "open_pull_request": ("Abriu pull request", "title"),
 }

@@ -151,8 +151,11 @@ def prepare_workspace(run):
     return path
 
 
-def workspace_diff(run):
-    """Diff de tudo o que a execução mudou desde que saiu da branch padrão: os commits e o que ainda não foi commitado."""
+def workspace_diff(run, target=None):
+    """Diff de tudo o que a execução mudou desde que saiu da branch padrão: os commits e o que ainda não foi commitado.
+
+    `target` limita o diff a um arquivo ou pasta do worktree.
+    """
     path = workspace_path(run)
     timeout = settings.RUN_DIFF_TIMEOUT
     base = git("merge-base", "HEAD", f"origin/{run.project.default_branch}", cwd=path, timeout=timeout).strip()
@@ -163,7 +166,7 @@ def workspace_diff(run):
         git("read-tree", "HEAD", cwd=path, timeout=timeout, env=env)
         git("add", "-A", cwd=path, timeout=timeout, env=env)
         options = ["-c", "core.quotePath=false", "diff", "--cached", "--no-color", "--no-ext-diff", "-M"]
-        return git(*options, base, cwd=path, timeout=timeout, env=env)
+        return git(*options, base, "--", *([target] if target else []), cwd=path, timeout=timeout, env=env)
 
 
 def remove_workspace(run):

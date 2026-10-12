@@ -54,8 +54,20 @@ class AgentFormLayoutTests(AgentFormTestCase):
         self.assertEqual(
             groups,
             [
-                ("Leitura", ["Listar arquivos", "Ler arquivo", "Buscar no código"]),
-                ("Escrita", ["Escrever arquivo"]),
+                (
+                    "Leitura",
+                    [
+                        "Listar arquivos",
+                        "Ler arquivo",
+                        "Buscar no código",
+                        "Procurar arquivos",
+                        "Ver situação do git",
+                        "Ver diff",
+                        "Ver histórico",
+                        "Listar pull requests",
+                    ],
+                ),
+                ("Escrita", ["Escrever arquivo", "Editar arquivo"]),
                 ("Ações sensíveis", ["Rodar comando", "Abrir pull request"]),
             ],
         )

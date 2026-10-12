@@ -18,6 +18,8 @@ Feito com Django, Celery e LangGraph. Cada agente usa o provedor e o modelo do p
 - Execuções assíncronas com histórico de eventos, delegação e consumo de tokens.
 - Worktree isolado para cada execução, com branches `sonny/run-<id>`.
 - Aprovação humana para comandos no shell e abertura de pull requests.
+- Ferramentas para ler, procurar e editar arquivos, ver o diff e o histórico do git e consultar os pull
+  requests do GitHub, sem precisar de aprovação.
 - Continuação de execuções interrompidas, cancelamento e detecção de workers inativos.
 
 ## Requisitos

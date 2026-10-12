@@ -10,7 +10,7 @@ from django.conf import settings
 from django.utils import timezone
 from langchain_core.tools import tool
 
-from .workspace import git
+from .workspace import WorkspaceError, git, workspace_diff
 
 
 @dataclass(frozen=True)
@@ -26,7 +26,19 @@ TOOL_SPECS = {
     "list_files": ToolSpec("Listar arquivos", "Vê o conteúdo de pastas do repositório.", "Leitura"),
     "read_file": ToolSpec("Ler arquivo", "Lê arquivos do repositório.", "Leitura"),
     "search_files": ToolSpec("Buscar no código", "Procura um texto ou expressão regular nos arquivos.", "Leitura"),
+    "find_files": ToolSpec(
+        "Procurar arquivos", "Acha arquivos pelo nome ou por um padrão, como *.py ou src/**/*.html.", "Leitura"
+    ),
+    "git_status": ToolSpec("Ver situação do git", "Mostra a branch e os arquivos alterados no worktree.", "Leitura"),
+    "git_diff": ToolSpec(
+        "Ver diff", "Mostra o que a execução alterou, ou a diferença entre branches e commits.", "Leitura"
+    ),
+    "git_log": ToolSpec("Ver histórico", "Lista os commits do repositório ou de um arquivo.", "Leitura"),
+    "list_pull_requests": ToolSpec(
+        "Listar pull requests", "Consulta os pull requests do repositório no GitHub, sem alterar nada.", "Leitura"
+    ),
     "write_file": ToolSpec("Escrever arquivo", "Cria ou sobrescreve arquivos no worktree da execução.", "Escrita"),
+    "edit_file": ToolSpec("Editar arquivo", "Troca um trecho de um arquivo sem regravar o resto.", "Escrita"),
     "run_command": ToolSpec(
         "Rodar comando", "Executa comandos de shell no worktree.", "Ações sensíveis", requires_approval=True
     ),
@@ -39,6 +51,12 @@ TOOL_SPECS = {
 }
 
 DEFAULT_TOOLS = ["list_files", "read_file", "search_files"]
+# Situações aceitas por list_pull_requests e quantos pull requests ela traz, dos mais recentes
+PULL_REQUEST_STATES = {"open": "abertos", "closed": "fechados", "all": "todos"}
+PULL_REQUEST_LIMIT = 30
+# Commits que git_log traz quando o agente não diz quantos, e o máximo que ele pode pedir
+GIT_LOG_DEFAULT = 20
+GIT_LOG_MAX = 100
 
 
 class ToolError(Exception):
@@ -61,6 +79,20 @@ def _resolve(workspace, path):
     if target != root and target.relative_to(root).parts[0] == ".git":
         raise ToolError("O diretório .git não pode ser acessado.")
     return target
+
+
+def _revision(value):
+    """Referência ou intervalo do git vindo do agente; recusa o que o git leria como opção de linha de comando."""
+    if value.startswith("-") or any(character.isspace() for character in value):
+        raise ToolError(f"Referência inválida: {value}")
+    return value
+
+
+def _git_read(*args, cwd):
+    try:
+        return git(*args, cwd=cwd)
+    except WorkspaceError as exc:
+        raise ToolError(str(exc)) from None
 
 
 def github_repository(repo_url):
@@ -89,16 +121,41 @@ def build_tools(run, workspace, agent):
         )
         return _truncate("\n".join(entries)) or "(diretório vazio)"
 
-    @tool
-    def read_file(path: str) -> str:
-        """Lê um arquivo de texto do repositório. O caminho é relativo à raiz do repositório."""
+    def read_text(path):
         file = _resolve(workspace, path)
         if not file.is_file():
             raise ToolError(f"Arquivo não encontrado: {path}")
         try:
-            return _truncate(file.read_text())
+            # newline="": as quebras de linha voltam como estão no arquivo, para a edição não trocá-las
+            return file, file.read_text(newline="")
         except UnicodeDecodeError:
             raise ToolError(f"{path} não é um arquivo de texto.") from None
+
+    @tool
+    def read_file(path: str, start_line: int = 1, end_line: int = 0) -> str:
+        """Lê um arquivo de texto do repositório. O caminho é relativo à raiz do repositório.
+
+        Sem start_line e end_line, lê do começo. Arquivo grande vem cortado no fim de uma linha, com o
+        número dela: chame de novo com start_line para ler a continuação. end_line=0 lê até o fim.
+        """
+        lines = read_text(path)[1].splitlines(keepends=True)
+        if start_line < 1 or (end_line and end_line < start_line):
+            raise ToolError("Intervalo de linhas inválido.")
+        if start_line > max(len(lines), 1):
+            raise ToolError(f"{path} tem só {len(lines)} linhas.")
+        selected = lines[start_line - 1 : end_line or None]
+        shown = size = 0
+        for line in selected:
+            if size + len(line) > settings.TOOL_MAX_OUTPUT_CHARS:
+                break
+            size += len(line)
+            shown += 1
+        if shown == len(selected):
+            return "".join(selected)
+        if shown == 0:
+            return _truncate("".join(selected))  # uma linha sozinha já passa do limite
+        last = start_line + shown - 1
+        return "".join(selected[:shown]) + f"… (cortado na linha {last} de {len(lines)}; continue com start_line={last + 1})"
 
     @tool
     def search_files(pattern: str, path: str = ".") -> str:
@@ -116,6 +173,100 @@ def build_tools(run, workspace, agent):
         return _truncate(process.stdout) or "Nenhuma ocorrência encontrada."
 
     @tool
+    def find_files(pattern: str, path: str = ".") -> str:
+        """Procura arquivos pelo nome, com um padrão glob, e devolve os caminhos a partir da raiz do repositório.
+
+        Padrão sem barra vale em qualquer pasta (ex.: test_*.py). Com barra, é relativo a path e ** atravessa
+        pastas (ex.: src/**/*.html). Arquivos ignorados pelo .gitignore ficam de fora.
+        """
+        directory = _resolve(workspace, path)
+        if not directory.is_dir():
+            raise ToolError(f"Não é um diretório: {path}")
+        if not pattern:
+            raise ToolError("Informe o padrão a procurar.")
+        glob = pattern if "/" in pattern else f"**/{pattern}"
+        options = ["-c", "core.quotePath=false", "ls-files", "--full-name", "--cached", "--others", "--exclude-standard"]
+        listed = _git_read(*options, "--", f":(glob){glob}", cwd=directory).splitlines()
+        # O índice ainda lista arquivo apagado que não teve commit
+        found = sorted(name for name in listed if (workspace / name).is_file())
+        return _truncate("\n".join(found)) or "Nenhum arquivo encontrado."
+
+    @tool
+    def git_status() -> str:
+        """Mostra a branch atual e os arquivos alterados, novos ou apagados que ainda não têm commit."""
+        return _truncate(_git_read("-c", "core.quotePath=false", "status", "--short", "--branch", cwd=workspace))
+
+    @tool
+    def git_diff(revision: str = "", path: str = "") -> str:
+        """Mostra um diff do repositório.
+
+        Sem revision: tudo o que esta execução alterou desde a branch padrão, incluindo arquivos novos e o
+        que ainda não tem commit. Com revision: uma referência (ex.: origin/main), comparada com os arquivos
+        atuais, ou um intervalo entre duas (ex.: origin/main...origin/outra-branch). path limita o diff a
+        um arquivo ou pasta.
+        """
+        target = str(_resolve(workspace, path)) if path else None
+        if not revision:
+            try:
+                output = workspace_diff(run, target)
+            except WorkspaceError as exc:
+                raise ToolError(str(exc)) from None
+        else:
+            options = ["-c", "core.quotePath=false", "diff", "--no-color", "--no-ext-diff", "--no-textconv", "-M"]
+            output = _git_read(*options, _revision(revision), "--", *([target] if target else []), cwd=workspace)
+        return _truncate(output) or "Nenhuma diferença."
+
+    @tool
+    def git_log(path: str = "", revision: str = "", limit: int = GIT_LOG_DEFAULT) -> str:
+        """Lista os commits mais recentes: hash, data, autor e título.
+
+        path limita aos commits que mexeram em um arquivo ou pasta. revision escolhe de onde partir (ex.:
+        origin/main); sem ela, parte do estado atual da execução.
+        """
+        target = [str(_resolve(workspace, path))] if path else []
+        options = ["log", f"-n{min(max(limit, 1), GIT_LOG_MAX)}", "--date=short", "--format=%h %ad %an: %s"]
+        output = _git_read(*options, *([_revision(revision)] if revision else []), "--", *target, cwd=workspace)
+        return _truncate(output) or "Nenhum commit encontrado."
+
+    @tool
+    def list_pull_requests(state: str = "open") -> str:
+        """Lista os pull requests mais recentes do repositório no GitHub, com número, título, branches e link.
+
+        state: "open" (abertos, o padrão), "closed" (fechados ou mesclados) ou "all".
+        """
+        if state not in PULL_REQUEST_STATES:
+            raise ToolError(f"Situação inválida: {state}. Use {', '.join(PULL_REQUEST_STATES)}.")
+        repository = github_repository(run.project.repo_url)
+        if repository is None:
+            raise ToolError("O repositório deste projeto não é do GitHub.")
+        # Sem token a consulta ainda funciona em repositório público
+        token = get_secret(Service.GITHUB)
+        response = httpx.get(
+            f"https://api.github.com/repos/{repository}/pulls",
+            headers={"Accept": "application/vnd.github+json"} | ({"Authorization": f"Bearer {token}"} if token else {}),
+            params={"state": state, "per_page": PULL_REQUEST_LIMIT},
+            timeout=settings.GITHUB_API_TIMEOUT,
+        )
+        if response.status_code != 200:
+            hint = "" if token else " Sem token do GitHub cadastrado, só repositórios públicos podem ser consultados."
+            raise ToolError(f"O GitHub recusou a consulta ({response.status_code}): {response.text[:500]}{hint}")
+        lines = []
+        for item in response.json():
+            if item["merged_at"]:
+                situation = "mesclado"
+            elif item["state"] == "closed":
+                situation = "fechado"
+            else:
+                situation = "rascunho" if item["draft"] else "aberto"
+            lines.append(
+                f"#{item['number']} [{situation}] {item['title']} "
+                f"({item['head']['ref']} → {item['base']['ref']}, por {item['user']['login']}) {item['html_url']}"
+            )
+        if not lines:
+            return f"Nenhum pull request ({PULL_REQUEST_STATES[state]}) em {repository}."
+        return _truncate("\n".join(lines))
+
+    @tool
     def write_file(path: str, content: str) -> str:
         """Cria ou sobrescreve um arquivo de texto no repositório com o conteúdo informado."""
         file = _resolve(workspace, path)
@@ -124,6 +275,22 @@ def build_tools(run, workspace, agent):
         file.parent.mkdir(parents=True, exist_ok=True)
         file.write_text(content)
         return f"{path} gravado ({len(content)} caracteres)."
+
+    @tool
+    def edit_file(path: str, old_text: str, new_text: str, replace_all: bool = False) -> str:
+        """Troca um trecho de um arquivo por outro, sem regravar o resto. Prefira esta à write_file para alterar.
+
+        old_text precisa ser idêntico ao que está no arquivo, com espaços e quebras de linha. Se ele aparece
+        mais de uma vez, inclua mais linhas em volta para apontar um só lugar ou passe replace_all=true.
+        """
+        file, content = read_text(path)
+        count = content.count(old_text) if old_text else 0
+        if count == 0:
+            raise ToolError(f"Trecho não encontrado em {path}. Leia o arquivo de novo e copie o trecho exato.")
+        if count > 1 and not replace_all:
+            raise ToolError(f"O trecho aparece {count} vezes em {path}. Inclua mais contexto ou use replace_all.")
+        file.write_text(content.replace(old_text, new_text), newline="")
+        return f"{path} editado ({count} trecho{'s' if count > 1 else ''} substituído{'s' if count > 1 else ''})."
 
     @tool
     def run_command(command: str) -> str:
@@ -183,5 +350,18 @@ def build_tools(run, workspace, agent):
         run.save(update_fields=["pull_request_url"])
         return f"Pull request aberto: {run.pull_request_url}"
 
-    available = [list_files, read_file, search_files, write_file, run_command, open_pull_request]
+    available = [
+        list_files,
+        read_file,
+        search_files,
+        find_files,
+        git_status,
+        git_diff,
+        git_log,
+        list_pull_requests,
+        write_file,
+        edit_file,
+        run_command,
+        open_pull_request,
+    ]
     return [item for item in available if item.name in agent.tools]
