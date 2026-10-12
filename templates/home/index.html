@@ -14,6 +14,7 @@
           x-data="{
             sending: false,
             agent: '{{ form.agent.value|default_if_none:''|escapejs }}',
+            autonomous: {{ form.autonomous.value|yesno:'true,false' }},
             missing: JSON.parse(document.getElementById('agents-without-key').textContent),
             grow(field) { field.style.height = 'auto'; field.style.height = field.scrollHeight + 'px' }
           }"
@@ -47,6 +48,11 @@
                         {% endfor %}
                     </select>
                 </div>
+                <label class="flex select-none items-center gap-2 text-sm {% if can_submit %}cursor-pointer text-heading{% else %}cursor-not-allowed text-fg-disabled{% endif %}"
+                       title="O agente roda comandos e abre o pull request sem parar para pedir aprovação">
+                    <input type="checkbox" name="autonomous" id="autonomous" x-model="autonomous" {% if not can_submit %}disabled{% endif %} class="h-4 w-4 rounded-xs border border-default-medium bg-neutral-primary-soft focus:ring-2 focus:ring-brand-soft">
+                    Autônomo
+                </label>
                 <span class="ms-auto hidden text-xs text-body sm:inline">Ctrl+Enter para enviar</span>
                 <button type="submit" {% if can_submit %}:disabled="sending"{% else %}disabled{% endif %}
                         class="box-border inline-flex items-center rounded-base border px-4 py-2 text-sm font-medium leading-5 shadow-xs focus:outline-none disabled:cursor-not-allowed {% if can_submit %}cursor-pointer border-transparent bg-brand text-white hover:bg-brand-strong focus:ring-4 focus:ring-brand-medium disabled:opacity-60{% else %}border-default-medium bg-disabled text-fg-disabled{% endif %}">
@@ -55,6 +61,9 @@
                 </button>
             </div>
         </div>
+        <p x-cloak x-show="autonomous" class="mt-2.5 text-sm text-fg-warning">
+            Modo autônomo: nesta execução o agente roda comandos e abre o pull request sem pedir aprovação. Nada é mesclado sozinho.
+        </p>
         <p x-cloak x-show="missing[agent]" class="mt-2.5 text-sm text-fg-warning">
             O provedor deste agente está sem chave. Cadastre uma em <a href="{% url 'orchestrator:integration_list' %}" class="font-medium underline">Integrações</a> ou defina <code class="font-mono" x-text="missing[agent]"></code> no servidor; até lá, a execução vai falhar.
         </p>

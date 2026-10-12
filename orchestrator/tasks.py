@@ -69,6 +69,10 @@ def _graph_input(run, snapshot):
     if snapshot.next:
         return None  # parou no meio (falha ou worker reiniciado): continua do último passo salvo
     run.events.create(kind=RunEvent.Kind.STATUS, content=f"Agente {run.agent.name} começou a trabalhar.")
+    if run.autonomous:
+        run.events.create(
+            kind=RunEvent.Kind.STATUS, content="Modo autônomo: as ações sensíveis rodam sem pedir aprovação."
+        )
     return initial_state(run)
 
 

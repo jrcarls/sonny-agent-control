@@ -140,6 +140,8 @@ class Run(models.Model):
     pull_request_url = models.URLField("pull request", blank=True)
     # Última vez que a branch da execução foi enviada ao repositório remoto
     pushed_at = models.DateTimeField("enviada em", null=True, blank=True)
+    # Modo autônomo: as ferramentas sensíveis rodam direto, sem a execução parar para pedir aprovação
+    autonomous = models.BooleanField("modo autônomo", default=False)
     # Pedido de cancelamento de uma execução em andamento; o worker para no fim do passo atual
     cancel_requested = models.BooleanField(default=False)
     # Sinal de vida: o worker atualiza este horário enquanto trabalha na execução. Se ele para de

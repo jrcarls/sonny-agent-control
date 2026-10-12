@@ -543,7 +543,11 @@ class RunRetryView(LoginRequiredMixin, View):
     def post(self, request, pk):
         original = get_object_or_404(Run, pk=pk)
         run = Run.objects.create(
-            project=original.project, agent=original.agent, prompt=original.prompt, created_by=request.user
+            project=original.project,
+            agent=original.agent,
+            prompt=original.prompt,
+            autonomous=original.autonomous,
+            created_by=request.user,
         )
         enqueue(run, f"Execução colocada na fila (nova tentativa de {original}).")
         return redirect(run)

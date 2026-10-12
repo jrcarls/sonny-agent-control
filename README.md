@@ -125,11 +125,14 @@ o link para você abrir o pull request.
 - **Execução**: uma tarefa dada a um agente em um projeto. Roda no worker, em um worktree próprio
   (`.workspaces/runs/<id>`, branch `sonny/run-<id>`), com o estado salvo no Postgres a cada passo.
 - **Aprovação**: rodar comando e abrir pull request pausam a execução até alguém aprovar ou negar.
+- **Modo autônomo**: marcado ao enviar a tarefa, dispensa as aprovações daquela execução. O agente roda
+  comandos e abre o pull request sem parar; nada é mesclado sozinho.
 
 Uma execução pode ser cancelada, continuada do último passo salvo (se falhou) ou repetida do zero.
 
 > **Atenção:** a ferramenta "Rodar comando" executa no worktree, mas com o usuário e as permissões do
-> worker. Um comando aprovado alcança a máquina toda; a aprovação é a única barreira.
+> worker. Um comando aprovado alcança a máquina toda; a aprovação é a única barreira, e o modo autônomo
+> a remove. Use-o só com agentes e repositórios em que você confia.
 
 ## Estrutura
 

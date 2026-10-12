@@ -91,7 +91,7 @@ class CredentialForm(forms.Form):
 class RunForm(forms.ModelForm):
     class Meta:
         model = Run
-        fields = ["prompt", "project", "agent"]
+        fields = ["prompt", "project", "agent", "autonomous"]
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)

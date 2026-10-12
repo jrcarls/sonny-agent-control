@@ -4,6 +4,7 @@
      {% if run.is_working %}hx-get="{{ run.get_absolute_url }}" hx-trigger="every 2s" hx-swap="outerHTML"{% endif %}>
     <div class="mb-6 flex flex-wrap items-center gap-x-4 gap-y-2 text-sm text-body">
         {% include "runs/_status_badge.html" with run=run %}
+        {% if run.autonomous %}<span class="inline-flex items-center whitespace-nowrap rounded bg-warning-soft px-1.5 py-0.5 text-xs font-medium text-fg-warning" title="As ações sensíveis rodam sem pedir aprovação">Autônomo</span>{% endif %}
         <span>Criada em {{ run.created_at|date:"d/m/Y H:i" }}</span>
         {% if run.finished_at %}<span>Finalizada em {{ run.finished_at|date:"d/m/Y H:i" }}</span>{% endif %}
         <span>Branch <code class="font-mono text-heading">{{ run.branch }}</code></span>

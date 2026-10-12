@@ -115,7 +115,10 @@ def build_graph(run, workspace, checkpointer):
         return models[agent.pk]
 
     def needs_approval(agent_id, call):
-        # Ferramenta que o agente não tem habilitada é recusada direto, sem incomodar ninguém
+        # No modo autônomo ninguém é consultado. Fora dele, ferramenta que o agente não tem habilitada
+        # é recusada direto, sem incomodar ninguém.
+        if run.autonomous:
+            return False
         return call["name"] in toolsets[agent_id] and TOOL_SPECS[call["name"]].requires_approval
 
     def work(state: State):

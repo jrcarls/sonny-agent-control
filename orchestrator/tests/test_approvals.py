@@ -110,6 +110,48 @@ class ApprovalFlowTests(RunTestCase):
         self.assertContains(self.client.get(url, {"situacao": "historico"}), "Aprovada")
 
 
+class AutonomousRunTests(RunTestCase):
+    agent_tools = ["run_command"]
+
+    def test_sensitive_tool_runs_without_asking(self):
+        run = self.make_run(autonomous=True)
+        model = self.execute(run, tool_call("run_command", command="touch feito.txt"), AIMessage(content="Pronto."))
+        self.assertEqual((run.status, run.result), (Run.Status.SUCCEEDED, "Pronto."))
+        self.assertTrue((workspace_path(run) / "feito.txt").exists())
+        self.assertFalse(run.approvals.exists())
+        self.assertEqual(len(model.calls), 2)
+        self.assertTrue(run.events.filter(content__startswith="Modo autônomo").exists())
+        page = self.client.get(run.get_absolute_url())
+        self.assertContains(page, ">Autônomo</span>")
+
+    def test_tool_the_agent_does_not_have_is_still_refused(self):
+        run = self.make_run(autonomous=True)
+        model = self.execute(run, tool_call("write_file", path="a.txt", content="1"), AIMessage(content="Ok."))
+        self.assertEqual(model.calls[1][-1].content, "Ferramenta indisponível: write_file")
+        self.assertFalse((workspace_path(run) / "a.txt").exists())
+
+    def test_regular_run_says_nothing_about_autonomy(self):
+        run = self.make_run()
+        self.execute(run, AIMessage(content="Pronto."))
+        self.assertFalse(run.events.filter(content__startswith="Modo autônomo").exists())
+        self.assertNotContains(self.client.get(run.get_absolute_url()), ">Autônomo</span>")
+
+    def test_chosen_when_sending_the_task_and_kept_on_retry(self):
+        data = {"prompt": "Rode os testes", "project": self.project.pk, "agent": self.agent.pk}
+        with mock.patch.object(tasks.execute_run, "delay"):
+            self.client.post(reverse("home"), data)
+            self.client.post(reverse("home"), data | {"autonomous": "on"})
+            regular, autonomous = Run.objects.order_by("pk")
+            self.assertEqual((regular.autonomous, autonomous.autonomous), (False, True))
+            self.client.post(reverse("orchestrator:run_retry", args=[autonomous.pk]))
+        self.assertTrue(Run.objects.order_by("pk").last().autonomous)
+
+    def test_home_offers_the_option_unchecked(self):
+        page = self.client.get(reverse("home"))
+        self.assertContains(page, 'name="autonomous"')
+        self.assertContains(page, "autonomous: false")
+
+
 class CheckpointerApprovalTests(RunTestCase):
     agent_tools = ["run_command"]
 
