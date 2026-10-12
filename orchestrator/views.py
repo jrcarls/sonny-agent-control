@@ -6,7 +6,7 @@ from django.contrib import messages
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.contrib.messages.views import SuccessMessageMixin
 from django.db import transaction
-from django.db.models import Count, DecimalField, ExpressionWrapper, F, ProtectedError, Q, Sum, Value
+from django.db.models import Count, DecimalField, ExpressionWrapper, F, Max, ProtectedError, Q, Sum, Value
 from django.db.models.functions import Coalesce
 from django.http import Http404
 from django.shortcuts import get_object_or_404, redirect, render
@@ -19,9 +19,9 @@ from django.views.generic import CreateView, DeleteView, DetailView, ListView, T
 
 from .crypto import DecryptionError
 from .diffs import parse_diff
-from .forms import AgentForm, CredentialForm, ProjectForm, RunForm, SkillForm
+from .forms import AgentForm, CredentialForm, ProjectForm, RunForm, ScheduleForm, SkillForm
 from .integrations import INTEGRATIONS, IntegrationError, Service, environment_variable, github_login, mask
-from .models import Agent, Approval, Credential, Project, Run, RunEvent, Skill
+from .models import Agent, Approval, Credential, Project, Run, RunEvent, Schedule, Skill
 from .providers import (
     MODEL_SUGGESTIONS,
     ModelListError,
@@ -31,7 +31,7 @@ from .providers import (
     list_models,
     missing_api_keys,
 )
-from .tasks import MAX_EVENT_LENGTH, execute_run
+from .tasks import MAX_EVENT_LENGTH, enqueue, execute_run
 from .timeline import build_timeline
 from .workspace import WorkspaceError, list_remote_branches, workspace_diff, workspace_path
 
@@ -48,12 +48,6 @@ PROMPT_SUGGESTIONS = [
 ]
 
 
-def enqueue(run, event):
-    run.events.create(kind=RunEvent.Kind.STATUS, content=event)
-    # Só enfileira depois do commit, para o worker enxergar a execução no banco
-    transaction.on_commit(lambda: execute_run.delay(run.pk))
-
-
 class SidebarView(LoginRequiredMixin, TemplateView):
     """Só o menu lateral, para o htmx atualizar contadores e execuções recentes sem recarregar a página."""
 
@@ -61,13 +55,13 @@ class SidebarView(LoginRequiredMixin, TemplateView):
 
 
 class ProtectedDeleteMixin:
-    """Projetos e agentes com execuções não podem ser excluídos: avisa em vez de dar erro."""
+    """Projetos e agentes com execuções ou agendamentos não podem ser excluídos: avisa em vez de dar erro."""
 
     def form_valid(self, form):
         try:
             return super().form_valid(form)
         except ProtectedError:
-            messages.error(self.request, f"“{self.object}” tem execuções e não pode ser excluído.")
+            messages.error(self.request, f"“{self.object}” tem execuções ou agendamentos e não pode ser excluído.")
             return redirect(self.success_url)
 
 
@@ -516,6 +510,46 @@ class IntegrationTestView(LoginRequiredMixin, View):
         except (IntegrationError, ModelListError) as exc:
             context["error"] = str(exc)
         return render(request, "integrations/_test_result.html", context)
+
+
+class ScheduleListView(LoginRequiredMixin, ListView):
+    queryset = Schedule.objects.select_related("project", "agent").annotate(last_run_id=Max("runs__pk"))
+    template_name = "schedules/list.html"
+    context_object_name = "schedules"
+    paginate_by = PAGE_SIZE
+
+
+class ScheduleCreateView(LoginRequiredMixin, SuccessMessageMixin, CreateView):
+    model = Schedule
+    form_class = ScheduleForm
+    template_name = "schedules/form.html"
+    success_url = reverse_lazy("orchestrator:schedule_list")
+    success_message = "Agendamento criado."
+
+    def form_valid(self, form):
+        form.instance.created_by = self.request.user
+        return super().form_valid(form)
+
+
+class ScheduleUpdateView(LoginRequiredMixin, SuccessMessageMixin, UpdateView):
+    model = Schedule
+    form_class = ScheduleForm
+    template_name = "schedules/form.html"
+    success_url = reverse_lazy("orchestrator:schedule_list")
+    success_message = "Agendamento atualizado."
+    RECENT_RUNS = 10
+
+    def get_context_data(self, **kwargs):
+        runs = self.object.runs.select_related("project", "agent")[: self.RECENT_RUNS]
+        return super().get_context_data(**kwargs, runs=runs)
+
+
+class ScheduleDeleteView(LoginRequiredMixin, SuccessMessageMixin, DeleteView):
+    model = Schedule
+    template_name = "layouts/confirm_delete.html"
+    success_url = reverse_lazy("orchestrator:schedule_list")
+    success_message = "Agendamento excluído. As execuções que ele criou continuam na lista."
+    extra_context = {"cancel_url": success_url}
 
 
 class RunListView(LoginRequiredMixin, ListView):

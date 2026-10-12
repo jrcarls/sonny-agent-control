@@ -33,6 +33,9 @@
             </c-input>
         {% elif field.widget_type == "textarea" %}
             <c-input as="textarea" name="{{ field.html_name }}" id="{{ field.id_for_label }}" rows="{{ field.field.widget.attrs.rows|default:4 }}" :errors="field.errors" required="{% if field.field.required %}1{% endif %}" placeholder="{{ field.field.widget.attrs.placeholder }}">{{ field.value|default_if_none:'' }}</c-input>
+        {% elif field.widget_type == "datetime" %}
+            {# Sem dados enviados, o valor é um datetime e precisa ir no formato que o navegador espera #}
+            <c-input type="datetime-local" name="{{ field.html_name }}" id="{{ field.id_for_label }}" value="{% if field.form.is_bound %}{{ field.value|default_if_none:'' }}{% else %}{{ field.value|date:'Y-m-d\TH:i' }}{% endif %}" :errors="field.errors" required="{% if field.field.required %}1{% endif %}" />
         {% else %}
             <c-input type="text" name="{{ field.html_name }}" id="{{ field.id_for_label }}" value="{{ field.value|default_if_none:'' }}" :errors="field.errors" required="{% if field.field.required %}1{% endif %}" placeholder="{{ field.field.widget.attrs.placeholder }}" maxlength="{{ field.field.max_length|default_if_none:'' }}" />
         {% endif %}

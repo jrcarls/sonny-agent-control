@@ -6,7 +6,7 @@
 <div class="py-6">
     <a href="{% url 'orchestrator:run_list' %}" class="text-sm font-medium text-fg-brand hover:underline">← Execuções</a>
     <h1 class="mt-2 text-2xl font-semibold tracking-tight text-heading">{{ run }}</h1>
-    <p class="mt-1 mb-6 text-sm text-body">{{ run.agent.name }} em {{ run.project.name }}</p>
+    <p class="mt-1 mb-6 text-sm text-body">{{ run.agent.name }} em {{ run.project.name }}{% if run.schedule %} · criada pelo <a href="{{ run.schedule.get_absolute_url }}" class="font-medium text-fg-brand hover:underline">{{ run.schedule|lower }}</a>{% endif %}</p>
 
     <h2 class="mb-3 text-lg font-semibold text-heading">Tarefa</h2>
     <div class="mb-8 whitespace-pre-wrap rounded-base border border-default bg-neutral-secondary-medium p-5 text-sm text-heading">{{ run.prompt }}</div>

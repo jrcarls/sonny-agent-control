@@ -1,0 +1,58 @@
+{% extends "layouts/app.html" %}
+{% load tabler_icons %}
+
+{% block title %}Agendamentos{% endblock %}
+
+{% block content %}
+<div class="py-6">
+    <div class="mb-6 flex items-center justify-between">
+        <h1 class="text-2xl font-semibold tracking-tight text-heading">Agendamentos</h1>
+        <c-button href="{% url 'orchestrator:schedule_create' %}">
+            {% tabler_icon "plus" "me-1.5 h-4 w-4" %}
+            Novo agendamento
+        </c-button>
+    </div>
+    {% if schedules %}
+        <div class="overflow-x-auto rounded-base border border-default bg-neutral-primary-soft shadow-xs">
+            <table class="w-full text-left text-sm text-body">
+                <thead class="border-b border-default bg-neutral-secondary-medium text-sm text-body">
+                    <tr>
+                        <th scope="col" class="px-6 py-3 font-medium">Tarefa</th>
+                        <th scope="col" class="px-6 py-3 font-medium">Repetição</th>
+                        <th scope="col" class="px-6 py-3 font-medium">Próxima execução</th>
+                        <th scope="col" class="px-6 py-3 font-medium">Última execução</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for schedule in schedules %}
+                        <tr class="border-b border-default last:border-0">
+                            <th scope="row" class="max-w-xl px-6 py-4 font-medium text-heading">
+                                <a href="{{ schedule.get_absolute_url }}" class="block truncate hover:underline">{{ schedule.prompt|truncatechars:80 }}</a>
+                                <span class="mt-1 flex flex-wrap items-center gap-2 text-xs font-normal text-body">
+                                    {{ schedule.agent.name }} em {{ schedule.project.name }}
+                                    {% if schedule.autonomous %}<span class="rounded bg-warning-soft px-1.5 py-0.5 font-medium text-fg-warning" title="As ações sensíveis rodam sem pedir aprovação">Autônomo</span>{% endif %}
+                                </span>
+                            </th>
+                            <td class="whitespace-nowrap px-6 py-4">{{ schedule.get_frequency_display }}</td>
+                            <td class="px-6 py-4">
+                                {% if not schedule.is_active %}
+                                    <span class="rounded bg-neutral-tertiary px-1.5 py-0.5 text-xs font-medium text-body">Pausado</span>
+                                {% elif schedule.next_run_at %}
+                                    <span class="whitespace-nowrap">{{ schedule.next_run_at|date:"d/m/Y H:i" }}</span>
+                                {% else %}
+                                    <span class="rounded bg-neutral-tertiary px-1.5 py-0.5 text-xs font-medium text-body">Encerrado</span>
+                                {% endif %}
+                                {% if schedule.skipped_at %}<p class="mt-1 text-xs text-fg-warning">Pulada em {{ schedule.skipped_at|date:"d/m/Y H:i" }}: {{ schedule.skip_reason }}</p>{% endif %}
+                            </td>
+                            <td class="whitespace-nowrap px-6 py-4">{% if schedule.last_run_id %}<a href="{% url 'orchestrator:run_detail' schedule.last_run_id %}" class="font-medium text-fg-brand hover:underline">Execução #{{ schedule.last_run_id }}</a>{% else %}—{% endif %}</td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% if is_paginated %}<c-pagination :page_obj="page_obj" />{% endif %}
+    {% else %}
+        <c-empty-state icon="calendar-time" title="Nenhum agendamento ainda">Marque uma tarefa para rodar sozinha em um horário, uma vez só ou todo dia, toda semana ou todo mês.</c-empty-state>
+    {% endif %}
+</div>
+{% endblock %}

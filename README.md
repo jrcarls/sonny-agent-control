@@ -36,7 +36,7 @@ variável `COMPOSE_FILE`.
 |---|---|
 | `web` | Interface web; aplica as migrações ao subir |
 | `worker` | Executa os agentes (Celery) |
-| `beat` | Agenda a limpeza diária dos worktrees antigos |
+| `beat` | Dispara as tarefas periódicas: agendamentos e limpeza diária dos worktrees antigos |
 | `postgres`, `redis` | Banco e fila |
 | `tailwind`, `mailpit` | Só em desenvolvimento: recompila o CSS e recebe os e-mails |
 
@@ -128,6 +128,9 @@ precisar da chave SSH. Sem token, o agente envia a branch e entrega o link para 
 - **Aprovação**: rodar comando e abrir pull request pausam a execução até alguém aprovar ou negar.
 - **Modo autônomo**: marcado ao enviar a tarefa, dispensa as aprovações daquela execução. O agente roda
   comandos e abre o pull request sem parar; nada é mesclado sozinho.
+- **Agendamento**: uma tarefa com hora marcada, que roda uma vez só ou se repete todo dia, toda semana ou
+  todo mês. Quando o horário chega, o `beat` cria a execução. Se a anterior do mesmo agendamento ainda não
+  terminou (por exemplo, esperando aprovação), a rodada é pulada.
 
 A tela **Uso e custo** soma os tokens das execuções por projeto e por agente. O custo é uma estimativa e só
 aparece para os agentes com preço do modelo preenchido no cadastro (dólares por milhão de tokens).

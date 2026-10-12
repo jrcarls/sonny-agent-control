@@ -1,0 +1,29 @@
+{% extends "layouts/app.html" %}
+
+{% block title %}{% if object %}Editar agendamento{% else %}Novo agendamento{% endif %}{% endblock %}
+
+{% block content %}
+<div class="py-6">
+    <h1 class="mb-6 text-2xl font-semibold tracking-tight text-heading">{% if object %}Editar agendamento{% else %}Novo agendamento{% endif %}</h1>
+    <form method="post" novalidate>
+        {% csrf_token %}
+        <section class="mb-6 rounded-base border border-default bg-neutral-primary-soft p-5 shadow-xs">
+            <c-fields :form="form" />
+            {% if object.skipped_at %}
+                <p class="text-sm text-fg-warning">Pulada em {{ object.skipped_at|date:"d/m/Y H:i" }}: {{ object.skip_reason }}</p>
+            {% endif %}
+        </section>
+        <div class="flex items-center gap-3">
+            <c-button type="submit">Salvar</c-button>
+            <c-button variant="secondary" href="{% url 'orchestrator:schedule_list' %}">Cancelar</c-button>
+            {% if object %}
+                <a href="{% url 'orchestrator:schedule_delete' object.pk %}" class="ms-auto text-sm font-medium text-fg-danger-strong hover:underline">Excluir</a>
+            {% endif %}
+        </div>
+    </form>
+    {% if runs %}
+        <h2 class="mt-10 mb-3 text-lg font-semibold text-heading">Execuções deste agendamento</h2>
+        {% include "runs/_table.html" with runs=runs %}
+    {% endif %}
+</div>
+{% endblock %}

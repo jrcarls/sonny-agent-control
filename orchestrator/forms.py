@@ -1,6 +1,7 @@
 from django import forms
+from django.utils import timezone
 
-from .models import Agent, Credential, Project, Run, Skill
+from .models import Agent, Credential, Project, Run, Schedule, Skill
 from .tools import DEFAULT_TOOLS, TOOL_SPECS
 
 
@@ -152,3 +153,43 @@ class RunForm(forms.ModelForm):
         self.fields["agent"].queryset = Agent.objects.filter(is_active=True)
         # O modelo ao lado do nome ajuda a escolher entre agentes parecidos
         self.fields["agent"].label_from_instance = lambda agent: f"{agent.name} · {agent.model}"
+
+
+class ScheduleForm(forms.ModelForm):
+    class Meta:
+        model = Schedule
+        fields = ["prompt", "project", "agent", "starts_at", "frequency", "autonomous", "is_active"]
+        widgets = {
+            "prompt": forms.Textarea(attrs={"rows": 6, "placeholder": "Ex.: Rode os testes e corrija o que falhar"}),
+        }
+        help_texts = {
+            "frequency": (
+                "As repetições saem no mesmo horário da primeira execução: no mesmo dia da semana, se for "
+                "toda semana, ou no mesmo dia do mês, se for todo mês."
+            ),
+            "autonomous": (
+                "O agente roda comandos e abre o pull request sem pedir aprovação. Desmarcado, a execução "
+                "para e espera alguém aprovar, e a rodada seguinte é pulada enquanto ela não terminar."
+            ),
+            "is_active": "Agendamentos inativos não criam execuções.",
+        }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields["agent"].queryset = Agent.objects.filter(is_active=True)
+        self.fields["agent"].label_from_instance = lambda agent: f"{agent.name} · {agent.model}"
+        # Agendamento novo nasce ativo; pausar só faz sentido para um que já existe
+        if self.instance.pk is None:
+            del self.fields["is_active"]
+
+    def clean(self):
+        data = super().clean()
+        starts_at, once = data.get("starts_at"), data.get("frequency") == Schedule.Frequency.ONCE
+        # Só cobra quando o horário foi mexido: um agendamento que já rodou ainda pode ser editado
+        if starts_at and once and {"starts_at", "frequency"} & set(self.changed_data) and starts_at <= timezone.now():
+            self.add_error("starts_at", "Esse horário já passou. Escolha um no futuro ou uma repetição.")
+        return data
+
+    def save(self, commit=True):
+        self.instance.next_run_at = self.instance.next_occurrence(timezone.now())
+        return super().save(commit)

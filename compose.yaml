@@ -67,7 +67,7 @@ services:
       web:
         condition: service_healthy
 
-  # Agenda a limpeza diária dos worktrees antigos
+  # Dispara as tarefas periódicas: agendamentos, limpeza dos worktrees e execuções sem sinal de vida
   beat:
     <<: *app
     command: celery -A config beat -l info --schedule /tmp/celerybeat-schedule

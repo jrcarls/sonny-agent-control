@@ -13,7 +13,7 @@ from langgraph.types import Command
 from psycopg.conninfo import make_conninfo
 
 from .graph import USAGE, build_graph, follow_up_state, initial_state
-from .models import Approval, Run, RunEvent
+from .models import Approval, Run, RunEvent, Schedule
 from .workspace import prepare_workspace, remove_workspace, workspace_path, workspaces_root
 
 # Tamanho máximo, em caracteres, do texto guardado em cada evento do andamento
@@ -171,6 +171,47 @@ def execute_run(self, run_id):
             run.follow_up = ""
             run.events.create(kind=RunEvent.Kind.STATUS, content="Execução concluída.")
         run.save(update_fields=["result", "status", "finished_at", "follow_up"])
+
+
+def enqueue(run, event):
+    run.events.create(kind=RunEvent.Kind.STATUS, content=event)
+    # Só enfileira depois do commit, para o worker enxergar a execução no banco
+    transaction.on_commit(lambda: execute_run.delay(run.pk))
+
+
+@shared_task
+def run_due_schedules():
+    """Cria as execuções dos agendamentos cujo horário chegou. Devolve quantas foram criadas."""
+    now = timezone.now()
+    due = Schedule.objects.filter(is_active=True, next_run_at__lte=now)
+    created = 0
+    for pk in list(due.values_list("pk", flat=True)):
+        with transaction.atomic():
+            # Trava e confere de novo: outra rodada ou uma edição na tela pode ter passado na frente
+            schedule = due.select_for_update(of=("self",)).select_related("agent").filter(pk=pk).first()
+            if schedule is None:
+                continue
+            if not schedule.agent.is_active:
+                reason = "O agente está inativo."
+            elif schedule.runs.filter(status__in=Run.ACTIVE_STATUSES).exists():
+                # Não empilha: se a execução anterior ainda não terminou, esta rodada é pulada
+                reason = "A execução anterior ainda não tinha terminado."
+            else:
+                reason = ""
+                run = schedule.runs.create(
+                    project=schedule.project,
+                    agent=schedule.agent,
+                    prompt=schedule.prompt,
+                    autonomous=schedule.autonomous,
+                    created_by=schedule.created_by,
+                )
+                enqueue(run, "Execução criada pelo agendamento e colocada na fila.")
+                created += 1
+            schedule.skipped_at, schedule.skip_reason = (now if reason else None), reason
+            # Conta a partir de agora: se o beat ficou parado, as rodadas perdidas não saem todas de uma vez
+            schedule.next_run_at = schedule.next_occurrence(now)
+            schedule.save(update_fields=["skipped_at", "skip_reason", "next_run_at"])
+    return created
 
 
 def _fail_orphaned(runs, reason):

@@ -1,6 +1,6 @@
 from django.contrib import admin
 
-from .models import Agent, Approval, Project, Run, RunEvent, Skill
+from .models import Agent, Approval, Project, Run, RunEvent, Schedule, Skill
 
 
 @admin.register(Project)
@@ -40,3 +40,9 @@ class RunAdmin(admin.ModelAdmin):
 class ApprovalAdmin(admin.ModelAdmin):
     list_display = ["pk", "run", "tool_name", "status", "decided_by", "created_at"]
     list_filter = ["status", "tool_name"]
+
+
+@admin.register(Schedule)
+class ScheduleAdmin(admin.ModelAdmin):
+    list_display = ["pk", "project", "agent", "frequency", "next_run_at", "is_active"]
+    list_filter = ["frequency", "is_active", "project", "agent"]

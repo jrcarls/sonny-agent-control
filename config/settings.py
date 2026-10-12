@@ -101,8 +101,9 @@ CELERY_TASK_TRACK_STARTED = True
 # Execuções são longas: cada processo do worker pega uma por vez, sem reservar outras da fila
 CELERY_WORKER_CONCURRENCY = env.int("CELERY_WORKER_CONCURRENCY", default=2)
 CELERY_WORKER_PREFETCH_MULTIPLIER = 1
-# Rodado pelo "celery beat": limpeza diária dos worktrees antigos
+# Rodado pelo "celery beat"
 CELERY_BEAT_SCHEDULE = {
+    # Limpeza diária dos worktrees antigos
     "cleanup-workspaces": {
         "task": "orchestrator.tasks.cleanup_workspaces",
         "schedule": crontab(hour=3, minute=0),
@@ -110,6 +111,11 @@ CELERY_BEAT_SCHEDULE = {
     # Marca como falha as execuções cujo worker morreu no meio do trabalho
     "fail-stale-runs": {
         "task": "orchestrator.tasks.fail_stale_runs",
+        "schedule": 60.0,
+    },
+    # Cria as execuções dos agendamentos cujo horário chegou
+    "run-due-schedules": {
+        "task": "orchestrator.tasks.run_due_schedules",
         "schedule": 60.0,
     },
 }

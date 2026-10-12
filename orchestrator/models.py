@@ -1,3 +1,5 @@
+from calendar import monthrange
+from datetime import date, datetime, timedelta
 from decimal import Decimal
 
 from django.conf import settings
@@ -151,6 +153,64 @@ class Credential(models.Model):
         return decrypt(self.secret, API_KEYS)
 
 
+class Schedule(models.Model):
+    """Tarefa com hora marcada: quando o horário chega, o beat cria uma execução (tasks.run_due_schedules)."""
+
+    class Frequency(models.TextChoices):
+        ONCE = "once", "Não repete"
+        DAILY = "daily", "Todo dia"
+        WEEKLY = "weekly", "Toda semana"
+        MONTHLY = "monthly", "Todo mês"
+
+    project = models.ForeignKey(Project, verbose_name="projeto", on_delete=models.PROTECT, related_name="schedules")
+    agent = models.ForeignKey(Agent, verbose_name="agente", on_delete=models.PROTECT, related_name="schedules")
+    prompt = models.TextField("tarefa")
+    autonomous = models.BooleanField("modo autônomo", default=False)
+    # Primeira execução. As repetições saem dela: mesmo horário, mesmo dia da semana ou mesmo dia do mês.
+    starts_at = models.DateTimeField("primeira execução")
+    frequency = models.CharField("repetição", max_length=20, choices=Frequency, default=Frequency.ONCE)
+    is_active = models.BooleanField("ativo", default=True)
+    # Quando o beat deve criar a próxima execução; vazio se não há mais nenhuma por vir
+    next_run_at = models.DateTimeField("próxima execução", null=True, blank=True, editable=False, db_index=True)
+    # Última vez em que o horário chegou e a execução não foi criada, e por quê
+    skipped_at = models.DateTimeField(null=True, blank=True, editable=False)
+    skip_reason = models.CharField(max_length=255, blank=True, editable=False)
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, verbose_name="criado por", on_delete=models.PROTECT, related_name="schedules"
+    )
+    created_at = models.DateTimeField("criado em", auto_now_add=True)
+
+    class Meta:
+        verbose_name = "agendamento"
+        verbose_name_plural = "agendamentos"
+        ordering = [models.F("next_run_at").asc(nulls_last=True), "-created_at"]
+
+    def __str__(self):
+        return f"Agendamento #{self.pk}"
+
+    def get_absolute_url(self):
+        return reverse("orchestrator:schedule_update", args=[self.pk])
+
+    def next_occurrence(self, after):
+        """Primeiro horário do agendamento depois de `after`; None se ele não repete e o horário já passou."""
+        if self.starts_at > after:
+            return self.starts_at
+        if self.frequency == self.Frequency.ONCE:
+            return None
+        # A repetição é contada no horário local, para "todo dia às 9h" continuar às 9h
+        start, today = timezone.localtime(self.starts_at), timezone.localdate(after)
+        if self.frequency == self.Frequency.MONTHLY:
+            months = [(today.year, today.month), (today.year + today.month // 12, today.month % 12 + 1)]
+            # Dia 31 em mês mais curto cai no último dia do mês
+            days = [date(year, month, min(start.day, monthrange(year, month)[1])) for year, month in months]
+        else:
+            step = 1 if self.frequency == self.Frequency.DAILY else 7
+            first = today + timedelta(days=(start.weekday() - today.weekday()) % step)
+            days = [first, first + timedelta(days=step)]
+        moments = [timezone.make_aware(datetime.combine(day, start.time())) for day in days]
+        return next(moment for moment in moments if moment > after)
+
+
 class Run(models.Model):
     class Status(models.TextChoices):
         QUEUED = "queued", "Na fila"
@@ -165,6 +225,10 @@ class Run(models.Model):
     project = models.ForeignKey(Project, verbose_name="projeto", on_delete=models.PROTECT, related_name="runs")
     agent = models.ForeignKey(Agent, verbose_name="agente", on_delete=models.PROTECT, related_name="runs")
     prompt = models.TextField("tarefa")
+    # Agendamento que criou a execução; vazio nas que foram pedidas na tela
+    schedule = models.ForeignKey(
+        Schedule, verbose_name="agendamento", on_delete=models.SET_NULL, null=True, blank=True, related_name="runs"
+    )
     status = models.CharField("situação", max_length=20, choices=Status, default=Status.QUEUED)
     result = models.TextField("resultado", blank=True)
     pull_request_url = models.URLField("pull request", blank=True)
