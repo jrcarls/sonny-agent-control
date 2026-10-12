@@ -50,6 +50,27 @@ class Project(models.Model):
         return reverse("orchestrator:project_update", args=[self.pk])
 
 
+class Skill(models.Model):
+    """Instruções reutilizáveis em Markdown. Entram no prompt de todo agente que a tem marcada."""
+
+    name = models.CharField("nome", max_length=100, unique=True)
+    description = models.CharField("para que serve", max_length=255, blank=True)
+    content = models.TextField("conteúdo")
+    created_at = models.DateTimeField("criada em", auto_now_add=True)
+    updated_at = models.DateTimeField("atualizada em", auto_now=True)
+
+    class Meta:
+        verbose_name = "skill"
+        verbose_name_plural = "skills"
+        ordering = ["name"]
+
+    def __str__(self):
+        return self.name
+
+    def get_absolute_url(self):
+        return reverse("orchestrator:skill_update", args=[self.pk])
+
+
 class Agent(models.Model):
     class Provider(models.TextChoices):
         ANTHROPIC = "anthropic", "Anthropic"
@@ -64,6 +85,7 @@ class Agent(models.Model):
     system_prompt = models.TextField("instruções", blank=True)
     # Nomes das ferramentas habilitadas (chaves de tools.TOOL_SPECS)
     tools = models.JSONField("ferramentas", default=list, blank=True)
+    skills = models.ManyToManyField(Skill, verbose_name="skills", blank=True, related_name="agents")
     delegates = models.ManyToManyField(
         "self", verbose_name="pode delegar para", symmetrical=False, blank=True, related_name="delegated_by"
     )

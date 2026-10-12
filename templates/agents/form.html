@@ -60,6 +60,28 @@
             <c-field :field="form.system_prompt" />
         </section>
 
+        <fieldset class="mb-6 rounded-base border border-default bg-neutral-primary-soft p-5 shadow-xs">
+            <legend class="sr-only">Skills</legend>
+            <h2 class="mb-1 text-lg font-semibold text-heading">Skills</h2>
+            {% if form.skills %}
+                <p class="mb-4 text-sm text-body">{{ form.skills.help_text }}</p>
+                <div class="space-y-2">
+                    {% for option in form.skills %}
+                        <label for="{{ option.id_for_label }}" class="flex cursor-pointer items-start gap-3 rounded-base border border-default p-3 hover:bg-neutral-secondary-medium">
+                            <c-checkbox name="{{ form.skills.html_name }}" value="{{ option.data.value }}" id="{{ option.id_for_label }}" checked="{% if option.data.selected %}1{% endif %}" class="mt-0.5" />
+                            <span class="min-w-0 flex-1">
+                                <span class="block text-sm font-medium text-heading">{{ option.data.value.instance.name }}</span>
+                                {% if option.data.value.instance.description %}<span class="block text-sm text-body">{{ option.data.value.instance.description }}</span>{% endif %}
+                            </span>
+                        </label>
+                    {% endfor %}
+                </div>
+                {% for error in form.skills.errors %}<p class="mt-2 text-sm text-fg-danger-strong">{{ error }}</p>{% endfor %}
+            {% else %}
+                <p class="text-sm text-body">Skills são instruções reutilizáveis, escritas uma vez e marcadas em vários agentes. Nenhuma foi cadastrada ainda: <a href="{% url 'orchestrator:skill_create' %}" class="font-medium text-fg-brand hover:underline">criar a primeira</a>.</p>
+            {% endif %}
+        </fieldset>
+
         <section class="mb-6 rounded-base border border-default bg-neutral-primary-soft p-5 shadow-xs">
             <h2 class="mb-1 text-lg font-semibold text-heading">Permissões</h2>
             <p class="mb-4 text-sm text-body">{{ form.tools.help_text }}</p>

@@ -16,9 +16,9 @@ from django.views.generic import CreateView, DeleteView, DetailView, ListView, T
 
 from .crypto import DecryptionError
 from .diffs import parse_diff
-from .forms import AgentForm, CredentialForm, ProjectForm, RunForm
+from .forms import AgentForm, CredentialForm, ProjectForm, RunForm, SkillForm
 from .integrations import INTEGRATIONS, IntegrationError, Service, environment_variable, github_login, mask
-from .models import Agent, Approval, Credential, Project, Run, RunEvent
+from .models import Agent, Approval, Credential, Project, Run, RunEvent, Skill
 from .providers import (
     MODEL_SUGGESTIONS,
     ModelListError,
@@ -339,6 +339,39 @@ class AgentDeleteView(LoginRequiredMixin, ProtectedDeleteMixin, SuccessMessageMi
     template_name = "layouts/confirm_delete.html"
     success_url = reverse_lazy("orchestrator:agent_list")
     success_message = "Agente excluído."
+    extra_context = {"cancel_url": success_url}
+
+
+class SkillListView(LoginRequiredMixin, ListView):
+    queryset = Skill.objects.annotate(agent_count=Count("agents"))
+    template_name = "skills/list.html"
+    context_object_name = "skills"
+
+
+class SkillCreateView(LoginRequiredMixin, SuccessMessageMixin, CreateView):
+    model = Skill
+    form_class = SkillForm
+    template_name = "skills/form.html"
+    success_url = reverse_lazy("orchestrator:skill_list")
+    success_message = "Skill “%(name)s” criada. Marque-a nos agentes que devem segui-la."
+
+
+class SkillUpdateView(LoginRequiredMixin, SuccessMessageMixin, UpdateView):
+    model = Skill
+    form_class = SkillForm
+    template_name = "skills/form.html"
+    success_url = reverse_lazy("orchestrator:skill_list")
+    success_message = "Skill “%(name)s” atualizada. Vale a partir da próxima execução."
+
+    def get_context_data(self, **kwargs):
+        return super().get_context_data(**kwargs, agents=self.object.agents.all())
+
+
+class SkillDeleteView(LoginRequiredMixin, SuccessMessageMixin, DeleteView):
+    model = Skill
+    template_name = "layouts/confirm_delete.html"
+    success_url = reverse_lazy("orchestrator:skill_list")
+    success_message = "Skill excluída."
     extra_context = {"cancel_url": success_url}
 
 

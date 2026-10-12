@@ -1,6 +1,6 @@
 from django.contrib import admin
 
-from .models import Agent, Approval, Project, Run, RunEvent
+from .models import Agent, Approval, Project, Run, RunEvent, Skill
 
 
 @admin.register(Project)
@@ -14,6 +14,12 @@ class AgentAdmin(admin.ModelAdmin):
     list_display = ["name", "provider", "model", "is_active"]
     list_filter = ["provider", "is_active"]
     search_fields = ["name"]
+
+
+@admin.register(Skill)
+class SkillAdmin(admin.ModelAdmin):
+    list_display = ["name", "description", "updated_at"]
+    search_fields = ["name", "description"]
 
 
 class RunEventInline(admin.TabularInline):

@@ -1,0 +1,27 @@
+{% extends "layouts/app.html" %}
+
+{% block title %}{% if object %}Editar skill{% else %}Nova skill{% endif %}{% endblock %}
+
+{% block content %}
+<div class="py-6">
+    <h1 class="mb-6 text-2xl font-semibold tracking-tight text-heading">{% if object %}Editar skill{% else %}Nova skill{% endif %}</h1>
+    <form method="post" novalidate>
+        {% csrf_token %}
+        <section class="mb-6 rounded-base border border-default bg-neutral-primary-soft p-5 shadow-xs">
+            <c-fields :form="form" />
+            {% if object %}
+                <p class="text-sm text-body">
+                    {% if agents %}Usada por: {% for agent in agents %}<a href="{{ agent.get_absolute_url }}" class="font-medium text-fg-brand hover:underline">{{ agent.name }}</a>{% if not forloop.last %}, {% endif %}{% endfor %}.{% else %}Nenhum agente usa esta skill ainda: marque-a no cadastro do agente.{% endif %}
+                </p>
+            {% endif %}
+        </section>
+        <div class="flex items-center gap-3">
+            <c-button type="submit">Salvar</c-button>
+            <c-button variant="secondary" href="{% url 'orchestrator:skill_list' %}">Cancelar</c-button>
+            {% if object %}
+                <a href="{% url 'orchestrator:skill_delete' object.pk %}" class="ms-auto text-sm font-medium text-fg-danger-strong hover:underline">Excluir</a>
+            {% endif %}
+        </div>
+    </form>
+</div>
+{% endblock %}

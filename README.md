@@ -122,6 +122,8 @@ o link para você abrir o pull request.
 
 - **Projeto**: um repositório git e a branch de onde as execuções partem.
 - **Agente**: provedor, modelo, instruções, ferramentas habilitadas e para quais agentes ele pode delegar.
+- **Skill**: instruções reutilizáveis em Markdown (convenções do projeto, roteiro de revisão). Escritas uma
+  vez e marcadas em vários agentes, entram nas instruções deles em toda execução.
 - **Execução**: uma tarefa dada a um agente em um projeto. Roda no worker, em um worktree próprio
   (`.workspaces/runs/<id>`, branch `sonny/run-<id>`), com o estado salvo no Postgres a cada passo.
 - **Aprovação**: rodar comando e abrir pull request pausam a execução até alguém aprovar ou negar.

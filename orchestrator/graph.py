@@ -72,10 +72,11 @@ def _delegate_tool(delegates):
     return delegate_task
 
 
-def _system_prompt(run, agent, delegates, caller):
+def _system_prompt(run, agent, skills, delegates, caller):
     project = run.project
     parts = [
         agent.system_prompt,
+        *(f"## Skill: {skill.name}\n\n{skill.content}" for skill in skills),
         f"Projeto: {project.name}\n"
         f"Repositório: {project.repo_url}\n"
         f"Você trabalha em uma cópia isolada do repositório, na branch {run.branch}, "
@@ -102,6 +103,7 @@ def _entry(kind, agent, content):
 
 def build_graph(run, workspace, checkpointer):
     agents, delegates = _load_agents(run.agent)
+    skills = {pk: list(agent.skills.all()) for pk, agent in agents.items()}
     toolsets = {pk: {item.name: item for item in build_tools(run, workspace, agent)} for pk, agent in agents.items()}
     models = {}
 
@@ -127,7 +129,7 @@ def build_graph(run, workspace, checkpointer):
         frame = frames[-1]
         agent = agents[frame["agent_id"]]
         caller = agents[frames[-2]["agent_id"]] if len(frames) > 1 else None
-        system = SystemMessage(_system_prompt(run, agent, delegates[agent.pk], caller))
+        system = SystemMessage(_system_prompt(run, agent, skills[agent.pk], delegates[agent.pk], caller))
         response = model_for(agent).invoke([system, *frame["messages"]])
         frame["messages"].append(response)
 

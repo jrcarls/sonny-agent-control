@@ -1,6 +1,6 @@
 from django import forms
 
-from .models import Agent, Credential, Project, Run
+from .models import Agent, Credential, Project, Run, Skill
 from .tools import DEFAULT_TOOLS, TOOL_SPECS
 
 
@@ -17,6 +17,30 @@ class ProjectForm(forms.ModelForm):
         }
 
 
+class SkillForm(forms.ModelForm):
+    class Meta:
+        model = Skill
+        fields = ["name", "description", "content"]
+        widgets = {
+            "name": forms.TextInput(attrs={"placeholder": "Ex.: Convenções do projeto"}),
+            "description": forms.TextInput(attrs={"placeholder": "Ex.: padrões de código e de commit do time"}),
+            "content": forms.Textarea(
+                attrs={
+                    "rows": 18,
+                    "placeholder": (
+                        "Escreva em Markdown o que o agente deve seguir. Ex.:\n\n"
+                        "- Rode os testes antes de dizer que terminou.\n"
+                        "- Mensagens de commit em português, no imperativo."
+                    ),
+                }
+            ),
+        }
+        help_texts = {
+            "description": "Aparece na lista e no cadastro do agente, para você escolher a skill certa.",
+            "content": "Entra inteiro nas instruções de cada agente que tiver esta skill marcada.",
+        }
+
+
 class AgentForm(forms.ModelForm):
     tools = forms.MultipleChoiceField(
         label="Ferramentas",
@@ -25,6 +49,13 @@ class AgentForm(forms.ModelForm):
         choices=[(name, spec.label) for name, spec in TOOL_SPECS.items()],
         initial=DEFAULT_TOOLS,
         help_text="Sem ferramentas, o agente só responde em texto.",
+    )
+    skills = forms.ModelMultipleChoiceField(
+        label="Skills",
+        queryset=Skill.objects.all(),
+        required=False,
+        widget=forms.CheckboxSelectMultiple,
+        help_text="Instruções reutilizáveis somadas às do agente em toda execução.",
     )
     delegates = forms.ModelMultipleChoiceField(
         label="Pode delegar para",
@@ -36,7 +67,7 @@ class AgentForm(forms.ModelForm):
 
     class Meta:
         model = Agent
-        fields = ["name", "description", "provider", "model", "system_prompt", "tools", "delegates", "is_active"]
+        fields = ["name", "description", "provider", "model", "system_prompt", "skills", "tools", "delegates", "is_active"]
         widgets = {
             "description": forms.TextInput(attrs={"placeholder": "Ex.: revisa pull requests"}),
             "model": forms.TextInput(attrs={"placeholder": "Escolha uma sugestão ou digite o identificador"}),
@@ -62,6 +93,9 @@ class AgentForm(forms.ModelForm):
         self.fields["delegates"].queryset = Agent.objects.exclude(pk=self.instance.pk)
         if not self.fields["delegates"].queryset.exists():
             del self.fields["delegates"]
+        # Sem skill cadastrada, a tela mostra o caminho para criar a primeira
+        if not self.fields["skills"].queryset.exists():
+            del self.fields["skills"]
         # Agente novo nasce ativo; desativar só faz sentido para um que já existe
         if self.instance.pk is None:
             del self.fields["is_active"]

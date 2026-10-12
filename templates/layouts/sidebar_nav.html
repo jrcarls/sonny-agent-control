@@ -52,6 +52,15 @@
                 <span class="ml-3 sm:sidebar-collapsed:hidden">Agentes</span>
             </a>
         </li>
+        <li>
+            <a href="{% url 'orchestrator:skill_list' %}" title="Skills" {% if sidebar.section == "skills" %}aria-current="page"{% endif %}
+               class="flex items-center px-2 py-2 text-sm leading-5 rounded-lg group sm:sidebar-collapsed:justify-center {% if sidebar.section == "skills" %}bg-gray-100 font-semibold text-gray-900 dark:bg-gray-700 dark:text-white{% else %}font-medium text-gray-600 hover:bg-gray-100 hover:text-gray-900 dark:text-gray-300 dark:hover:bg-gray-700 dark:hover:text-white{% endif %}">
+                <span class="relative shrink-0">
+                    {% if sidebar.section == "skills" %}{% tabler_icon "book-2" "shrink-0 w-5 h-5 transition duration-75 text-primary-600 dark:text-primary-400" %}{% else %}{% tabler_icon "book-2" "shrink-0 w-5 h-5 transition duration-75 text-gray-400 group-hover:text-gray-900 dark:group-hover:text-white" %}{% endif %}
+                </span>
+                <span class="ml-3 sm:sidebar-collapsed:hidden">Skills</span>
+            </a>
+        </li>
     </ul>
 
     {% if sidebar.recent_runs %}
