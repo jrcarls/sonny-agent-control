@@ -180,6 +180,14 @@ class ScheduleCrudTests(RunTestCase):
         response = self.client.post(reverse("orchestrator:project_delete", args=[self.project.pk]), follow=True)
         self.assertContains(response, "tem execuções ou agendamentos")
 
+    def test_list_shows_the_next_to_run_first_and_the_finished_last(self):
+        common = {"project": self.project, "agent": self.agent, "prompt": "x", "starts_at": timezone.now(), "created_by": self.user}
+        done = Schedule.objects.create(**common)
+        later = Schedule.objects.create(**common, next_run_at=timezone.now() + timedelta(days=2))
+        sooner = Schedule.objects.create(**common, next_run_at=timezone.now() + timedelta(days=1))
+        page = self.client.get(reverse("orchestrator:schedule_list"))
+        self.assertEqual(list(page.context["schedules"]), [sooner, later, done])
+
     def test_section_is_highlighted_in_the_sidebar(self):
         page = self.client.get(reverse("orchestrator:schedule_list"))
         self.assertEqual(page.context["sidebar"]["section"], "schedules")

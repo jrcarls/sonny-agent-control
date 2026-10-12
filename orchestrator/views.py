@@ -513,7 +513,12 @@ class IntegrationTestView(LoginRequiredMixin, View):
 
 
 class ScheduleListView(LoginRequiredMixin, ListView):
-    queryset = Schedule.objects.select_related("project", "agent").annotate(last_run_id=Max("runs__pk"))
+    # A ordem é repetida aqui porque a anotação agrupa a consulta e descarta a ordem padrão do modelo
+    queryset = (
+        Schedule.objects.select_related("project", "agent")
+        .annotate(last_run_id=Max("runs__pk"))
+        .order_by(F("next_run_at").asc(nulls_last=True), "-created_at")
+    )
     template_name = "schedules/list.html"
     context_object_name = "schedules"
     paginate_by = PAGE_SIZE
