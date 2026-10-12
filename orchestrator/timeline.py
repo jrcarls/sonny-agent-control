@@ -22,6 +22,7 @@ SUMMARIES = {
     "write_file": ("Escreveu", "path"),
     "edit_file": ("Editou", "path"),
     "run_command": ("Rodou", "command"),
+    "run_tests": ("Rodou os testes", ""),
     "open_pull_request": ("Abriu pull request", "title"),
 }
 # Começo do resultado quando a ferramenta não fez o que foi pedido

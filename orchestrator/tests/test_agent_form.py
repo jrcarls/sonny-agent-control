@@ -68,7 +68,7 @@ class AgentFormLayoutTests(AgentFormTestCase):
                     ],
                 ),
                 ("Escrita", ["Escrever arquivo", "Editar arquivo"]),
-                ("Ações sensíveis", ["Rodar comando", "Abrir pull request"]),
+                ("Ações sensíveis", ["Rodar comando", "Rodar testes", "Abrir pull request"]),
             ],
         )
         self.assertContains(page, "pede aprovação", count=2)

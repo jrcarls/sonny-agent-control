@@ -119,6 +119,13 @@ class ToolTests(RunTestCase):
         self.assertIn("código de saída: 3", output)
         self.assertIn("oi\nREADME.md", output)
 
+    def test_commands_do_not_see_the_environment_of_the_server(self):
+        command = "echo segredo=$SEGREDO liberada=$LIBERADA; command -v git >/dev/null && echo tem-path"
+        with mock.patch.dict("os.environ", {"SEGREDO": "senha", "LIBERADA": "sim"}):
+            self.assertIn("segredo= liberada=\ntem-path", self.call("run_command", command=command))
+            with self.settings(TOOL_ENV_PASSTHROUGH=["LIBERADA", "NAO_DEFINIDA"]):
+                self.assertIn("segredo= liberada=sim\n", self.call("run_command", command=command))
+
 
 class ToolLoopTests(RunTestCase):
     agent_tools = ["read_file"]
@@ -148,6 +155,45 @@ class ToolLoopTests(RunTestCase):
         # run_command não está habilitado para este agente: nem executa nem pede aprovação
         self.assertIn("Ferramenta indisponível", model.calls[2][-1].content)
         self.assertTrue((workspace_path(run) / "README.md").exists())
+
+
+class RunTestsToolTests(RunTestCase):
+    agent_tools = ["write_file", "run_tests"]
+
+    def setUp(self):
+        super().setUp()
+        self.run_ = self.make_run()
+        self.workspace = prepare_workspace(self.run_)
+        self.tools = {item.name: item for item in build_tools(self.run_, self.workspace, self.agent)}
+
+    def set_command(self, command):
+        type(self.project).objects.filter(pk=self.project.pk).update(test_command=command)
+
+    def test_runs_the_command_of_the_project_in_the_worktree(self):
+        self.set_command("ls && test -f passou.txt")
+        failed = self.tools["run_tests"].invoke({})
+        self.assertIn("código de saída: 1", failed)
+        self.assertIn("README.md", failed)
+        self.tools["write_file"].invoke({"path": "passou.txt", "content": "ok"})
+        self.assertIn("código de saída: 0", self.tools["run_tests"].invoke({}))
+
+    def test_without_a_command_in_the_project_it_is_an_error(self):
+        with self.assertRaisesMessage(ToolError, "não tem comando de teste"):
+            self.tools["run_tests"].invoke({})
+
+    @override_settings(TOOL_TEST_TIMEOUT=1)
+    def test_command_is_stopped_at_its_own_timeout(self):
+        self.set_command("sleep 5")
+        with self.assertRaisesMessage(ToolError, "passou do limite de 1s"):
+            self.tools["run_tests"].invoke({})
+
+    def test_running_the_tests_does_not_ask_for_approval(self):
+        self.set_command("echo testes ok")
+        run = self.make_run()
+        model = self.execute(run, tool_call("run_tests"), AIMessage(content="Passou."))
+        self.assertEqual((run.status, run.result), (Run.Status.SUCCEEDED, "Passou."))
+        self.assertIn("código de saída: 0\ntestes ok", model.calls[1][-1].content)
+        self.assertFalse(run.approvals.exists())
 
 
 @override_settings(GITHUB_TOKEN="token-de-teste", AGENT_GIT_NAME="Agente", AGENT_GIT_EMAIL="agente@example.com")

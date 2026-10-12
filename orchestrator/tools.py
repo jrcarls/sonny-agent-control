@@ -42,6 +42,11 @@ TOOL_SPECS = {
     "run_command": ToolSpec(
         "Rodar comando", "Executa comandos de shell no worktree.", "Ações sensíveis", requires_approval=True
     ),
+    "run_tests": ToolSpec(
+        "Rodar testes",
+        "Executa o comando de teste cadastrado no projeto, sem pedir aprovação. O agente não escolhe o comando.",
+        "Ações sensíveis",
+    ),
     "open_pull_request": ToolSpec(
         "Abrir pull request",
         "Faz commit e envia a branch. Com o token do GitHub abre o PR; sem ele, entrega o link para você abrir.",
@@ -57,6 +62,8 @@ PULL_REQUEST_LIMIT = 30
 # Commits que git_log traz quando o agente não diz quantos, e o máximo que ele pode pedir
 GIT_LOG_DEFAULT = 20
 GIT_LOG_MAX = 100
+# Variáveis do servidor que todo comando rodado por um agente recebe; as outras só com TOOL_ENV_PASSTHROUGH
+COMMAND_ENV = ("PATH", "HOME", "USER", "LOGNAME", "SHELL", "LANG", "LC_ALL", "LC_CTYPE", "TZ", "TERM", "TMPDIR")
 
 
 class ToolError(Exception):
@@ -79,6 +86,12 @@ def _resolve(workspace, path):
     if target != root and target.relative_to(root).parts[0] == ".git":
         raise ToolError("O diretório .git não pode ser acessado.")
     return target
+
+
+def _command_env():
+    """Ambiente dos comandos dos agentes: sem as chaves e senhas que o servidor tem nas variáveis dele."""
+    allowed = (*COMMAND_ENV, *settings.TOOL_ENV_PASSTHROUGH)
+    return {name: os.environ[name] for name in allowed if name in os.environ} | {"GIT_TERMINAL_PROMPT": "0"}
 
 
 def _revision(value):
@@ -292,9 +305,7 @@ def build_tools(run, workspace, agent):
         file.write_text(content.replace(old_text, new_text), newline="")
         return f"{path} editado ({count} trecho{'s' if count > 1 else ''} substituído{'s' if count > 1 else ''})."
 
-    @tool
-    def run_command(command: str) -> str:
-        """Executa um comando de shell na raiz do repositório e devolve o código de saída e a saída."""
+    def shell(command, timeout):
         try:
             process = subprocess.run(
                 command,
@@ -302,12 +313,30 @@ def build_tools(run, workspace, agent):
                 cwd=workspace,
                 capture_output=True,
                 text=True,
-                timeout=settings.TOOL_COMMAND_TIMEOUT,
-                env={**os.environ, "GIT_TERMINAL_PROMPT": "0"},
+                timeout=timeout,
+                env=_command_env(),
             )
         except subprocess.TimeoutExpired:
-            raise ToolError(f"O comando passou do limite de {settings.TOOL_COMMAND_TIMEOUT}s e foi interrompido.") from None
+            raise ToolError(f"O comando passou do limite de {timeout}s e foi interrompido.") from None
         return _truncate(f"código de saída: {process.returncode}\n{process.stdout}{process.stderr}")
+
+    @tool
+    def run_command(command: str) -> str:
+        """Executa um comando de shell na raiz do repositório e devolve o código de saída e a saída."""
+        return shell(command, settings.TOOL_COMMAND_TIMEOUT)
+
+    @tool
+    def run_tests() -> str:
+        """Roda o comando de teste do projeto na raiz do repositório e devolve o código de saída e a saída.
+
+        O comando é fixo, definido no cadastro do projeto. Código de saída 0 quer dizer que passou. Use depois
+        de alterar o código e antes de abrir o pull request.
+        """
+        # Lido do banco na hora: o comando pode ter sido cadastrado depois de a execução começar
+        command = type(run.project).objects.values_list("test_command", flat=True).get(pk=run.project_id)
+        if not command.strip():
+            raise ToolError("Este projeto não tem comando de teste cadastrado. Peça para cadastrarem no projeto.")
+        return shell(command, settings.TOOL_TEST_TIMEOUT)
 
     @tool
     def open_pull_request(title: str, body: str = "") -> str:
@@ -362,6 +391,7 @@ def build_tools(run, workspace, agent):
         write_file,
         edit_file,
         run_command,
+        run_tests,
         open_pull_request,
     ]
     return [item for item in available if item.name in agent.tools]

@@ -98,6 +98,8 @@ Quase tudo vem de variáveis de ambiente, lidas do `.env`. As principais:
 | `CELERY_WORKER_CONCURRENCY` | Quantas execuções rodam ao mesmo tempo (padrão 2) |
 | `RUN_MAX_TOKENS` | Teto de tokens por execução, somando todos os agentes; 0 desliga |
 | `WORKSPACE_RETENTION_DAYS` | Dias que o worktree de uma execução finalizada fica guardado |
+| `TOOL_ENV_PASSTHROUGH` | Variáveis do servidor, separadas por vírgula, que os comandos rodados pelos agentes enxergam (veja abaixo) |
+| `TOOL_TEST_TIMEOUT` | Prazo, em segundos, do comando de teste do projeto (padrão 900) |
 
 As chaves dos provedores e o token do GitHub também podem ser cadastrados na tela **Integrações** (menu do
 usuário). A chave salva lá fica no banco, criptografada com a `SECRET_KEY`, vale antes da variável de ambiente e
@@ -128,6 +130,11 @@ precisar da chave SSH. Sem token, o agente envia a branch e entrega o link para 
 - **Execução**: uma tarefa dada a um agente em um projeto. Roda no worker, em um worktree próprio
   (`.workspaces/runs/<id>`, branch `sonny/run-<id>`), com o estado salvo no Postgres a cada passo.
 - **Aprovação**: rodar comando e abrir pull request pausam a execução até alguém aprovar ou negar.
+- **Comando de teste**: cadastrado no projeto (por exemplo `ruff check . && pytest -q`). O agente o roda
+  pela ferramenta Rodar testes sem pedir aprovação, porque não é ele quem escolhe o comando.
+- **Ambiente dos comandos**: o que o agente roda (comando ou testes) recebe só as variáveis básicas do
+  servidor, como `PATH` e `HOME`. Chaves e senhas ficam de fora; para liberar alguma, liste o nome em
+  `TOOL_ENV_PASSTHROUGH`. Isso não isola o processo: ele ainda roda com o usuário do worker.
 - **Modo autônomo**: marcado ao enviar a tarefa, dispensa as aprovações daquela execução. O agente roda
   comandos e abre o pull request sem parar; nada é mesclado sozinho.
 - **Agendamento**: uma tarefa com hora marcada, que roda uma vez só ou se repete todo dia, toda semana ou

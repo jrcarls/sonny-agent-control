@@ -8,13 +8,18 @@ from .tools import DEFAULT_TOOLS, TOOL_SPECS
 class ProjectForm(forms.ModelForm):
     class Meta:
         model = Project
-        fields = ["name", "repo_url", "default_branch", "description"]
+        fields = ["name", "repo_url", "default_branch", "description", "test_command"]
         widgets = {
             "repo_url": forms.TextInput(attrs={"placeholder": "git@github.com:org/repo.git"}),
             "description": forms.Textarea(attrs={"rows": 3}),
+            "test_command": forms.TextInput(attrs={"placeholder": "Ex.: ruff check . && pytest -q"}),
         }
         help_texts = {
             "repo_url": "Para repositório privado, use o endereço SSH (git@…) e cadastre nele a chave do projeto.",
+            "test_command": (
+                "Roda na raiz do repositório quando o agente usa a ferramenta Rodar testes, sem pedir aprovação. "
+                "Em branco, a ferramenta fica sem efeito neste projeto."
+            ),
         }
 
 

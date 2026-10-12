@@ -158,6 +158,11 @@ TOOL_MAX_OUTPUT_CHARS = env.int("TOOL_MAX_OUTPUT_CHARS", default=20_000)
 # Prazo, em segundos, da ferramenta "Rodar comando" e da busca no código
 TOOL_COMMAND_TIMEOUT = env.int("TOOL_COMMAND_TIMEOUT", default=300)
 TOOL_SEARCH_TIMEOUT = env.int("TOOL_SEARCH_TIMEOUT", default=60)
+# Prazo, em segundos, da ferramenta "Rodar testes", que roda o comando de teste do projeto
+TOOL_TEST_TIMEOUT = env.int("TOOL_TEST_TIMEOUT", default=900)
+# Variáveis de ambiente do servidor, além das básicas (PATH, HOME, idioma), que os comandos rodados pelos agentes
+# enxergam. As demais, como chaves e senhas, ficam de fora
+TOOL_ENV_PASSTHROUGH = env.list("TOOL_ENV_PASSTHROUGH", default=[])
 # Prazo, em segundos, do botão "Testar agente" e da consulta à lista de modelos de um provedor
 AGENT_TEST_TIMEOUT = env.int("AGENT_TEST_TIMEOUT", default=60)
 PROVIDER_LIST_TIMEOUT = env.int("PROVIDER_LIST_TIMEOUT", default=10)

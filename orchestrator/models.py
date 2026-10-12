@@ -17,6 +17,8 @@ class Project(models.Model):
     repo_url = models.CharField("repositório", max_length=255)
     default_branch = models.CharField("branch padrão", max_length=100, default="main")
     description = models.TextField("descrição", blank=True)
+    # Roda pela ferramenta run_tests, sem aprovação: quem escolhe o comando é quem cadastra o projeto, não o agente
+    test_command = models.CharField("comando de teste", max_length=500, blank=True)
     # Par de chaves SSH do projeto. A pública é cadastrada no repositório (deploy key no GitHub);
     # a privada fica criptografada e só é usada pelo git ao clonar e enviar.
     ssh_private_key = models.TextField(blank=True, editable=False)
