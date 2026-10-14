@@ -76,8 +76,9 @@ class SidebarTests(RunTestCase):
 
     def test_user_menu_items(self):
         page = self.client.get(reverse("home"))
-        for label in ["Integrações", "Modo escuro", "Sair"]:
+        for label in ["Integrações", "Trocar senha", "Modo escuro", "Sair"]:
             self.assertContains(page, label)
+        self.assertContains(page, f'href="{reverse("account_change_password")}"')
         # Nada no menu aponta para lugar nenhum
         self.assertNotContains(page, 'href="#"')
 
