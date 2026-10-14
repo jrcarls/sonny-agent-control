@@ -1,0 +1,113 @@
+# Produção no Coolify: um arquivo só, com o mesmo conteúdo de compose.yaml + compose.prod.yaml.
+# O proxy do Coolify cuida do domínio e do HTTPS e chega na web pela rede interna, então nenhuma porta
+# é publicada na máquina. No Coolify, aponte o domínio do serviço "web" para a porta 8000
+# (ex.: https://agentes.exemplo.com:8000) e preencha as variáveis abaixo na aba Environment Variables.
+#
+# Os containers só recebem as variáveis listadas aqui. Para usar outra das que o config/settings.py lê
+# (timeouts, limites), acrescente-a em x-app-environment.
+
+x-app-environment: &app-environment
+  DEBUG: "False"
+  SECRET_KEY: ${SECRET_KEY:?defina SECRET_KEY}
+  ALLOWED_HOSTS: ${ALLOWED_HOSTS:?defina ALLOWED_HOSTS com o domínio}
+  CSRF_TRUSTED_ORIGINS: ${CSRF_TRUSTED_ORIGINS:?defina CSRF_TRUSTED_ORIGINS com https://seu-dominio}
+  DATABASE_URL: postgres://izzyone:${POSTGRES_PASSWORD:?defina POSTGRES_PASSWORD}@postgres:5432/izzyone
+  CELERY_BROKER_URL: redis://redis:6379/0
+  CELERY_RESULT_BACKEND: redis://redis:6379/1
+  WORKSPACES_DIR: /data/workspaces
+  SIGNUP_OPEN: ${SIGNUP_OPEN:-False}
+  # Chaves dos provedores de LLM; também podem ser cadastradas pela tela de Integrações
+  ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+  OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+  GOOGLE_API_KEY: ${GOOGLE_API_KEY:-}
+  DEEPSEEK_API_KEY: ${DEEPSEEK_API_KEY:-}
+  GITHUB_TOKEN: ${GITHUB_TOKEN:-}
+  # E-mail (recuperação de senha)
+  EMAIL_HOST: ${EMAIL_HOST:-localhost}
+  EMAIL_PORT: ${EMAIL_PORT:-1025}
+  EMAIL_HOST_USER: ${EMAIL_HOST_USER:-}
+  EMAIL_HOST_PASSWORD: ${EMAIL_HOST_PASSWORD:-}
+  EMAIL_USE_TLS: ${EMAIL_USE_TLS:-False}
+  DEFAULT_FROM_EMAIL: ${DEFAULT_FROM_EMAIL:-no-reply@localhost}
+  # Limites das execuções
+  CELERY_WORKER_CONCURRENCY: ${CELERY_WORKER_CONCURRENCY:-2}
+  RUN_MAX_TOKENS: ${RUN_MAX_TOKENS:-2000000}
+  WORKSPACE_RETENTION_DAYS: ${WORKSPACE_RETENTION_DAYS:-7}
+  TOOL_ENV_PASSTHROUGH: ${TOOL_ENV_PASSTHROUGH:-}
+
+# Configuração compartilhada por web, worker e beat, que rodam a mesma imagem
+x-app: &app
+  build:
+    context: .
+    target: prod
+  restart: unless-stopped
+  environment: *app-environment
+  volumes:
+    # Clones dos projetos e worktrees das execuções: o worker escreve, a web só consulta
+    - workspaces:/data/workspaces
+  depends_on: &app-depends-on
+    postgres:
+      condition: service_healthy
+    redis:
+      condition: service_healthy
+
+services:
+  postgres:
+    image: postgres:17
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: izzyone
+      POSTGRES_USER: izzyone
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?defina POSTGRES_PASSWORD}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U izzyone -d izzyone"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  redis:
+    image: redis:7
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  # Interface web. Aplica as migrações antes de subir, então worker e beat esperam por ela.
+  web:
+    <<: *app
+    command: >
+      sh -c "python manage.py migrate --noinput &&
+             gunicorn config.wsgi:application --bind 0.0.0.0:8000
+             --workers ${WEB_WORKERS:-3} --timeout 120 --access-logfile -"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/accounts/login/', timeout=3)"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 20s
+
+  # Executa os agentes
+  worker:
+    <<: *app
+    command: celery -A config worker -l info
+    depends_on:
+      <<: *app-depends-on
+      web:
+        condition: service_healthy
+
+  # Dispara as tarefas periódicas: agendamentos, limpeza dos worktrees e execuções sem sinal de vida
+  beat:
+    <<: *app
+    command: celery -A config beat -l info --schedule /tmp/celerybeat-schedule
+    depends_on:
+      <<: *app-depends-on
+      web:
+        condition: service_healthy
+
+volumes:
+  postgres_data:
+  workspaces:

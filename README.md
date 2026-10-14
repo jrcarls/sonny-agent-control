@@ -32,7 +32,7 @@ Para rodar fora do Docker (opcional): Python 3.14 com [uv](https://docs.astral.s
 
 Os ambientes são montados em camadas: `compose.yaml` descreve os serviços, e `compose.dev.yaml` ou
 `compose.prod.yaml` acrescentam o que é próprio de cada ambiente. O `.env` escolhe qual vale, pela
-variável `COMPOSE_FILE`.
+variável `COMPOSE_FILE`. A exceção é o `compose.coolify.yaml`, um arquivo único para o Coolify.
 
 | Serviço | Papel |
 |---|---|
@@ -72,6 +72,24 @@ docker compose exec web python manage.py createsuperuser    # a criação de con
 O código e os arquivos estáticos ficam dentro da imagem e a web roda com gunicorn. Ela escuta só em
 `127.0.0.1:8000`: coloque um proxy com HTTPS (Caddy, nginx, Traefik) na frente, repassando o cabeçalho
 `X-Forwarded-Proto`. Para atualizar, `git pull` e `docker compose up -d --build`.
+
+### Produção no Coolify
+
+O Coolify trabalha com um arquivo de compose só, então use o `compose.coolify.yaml`, que junta o
+`compose.yaml` e o `compose.prod.yaml`. O proxy do Coolify cuida do domínio e do HTTPS; não precisa de nginx.
+
+1. Crie um recurso a partir do repositório com o build pack **Docker Compose** e aponte o arquivo para
+   `/compose.coolify.yaml`.
+2. No serviço `web`, defina o domínio com a porta da aplicação: `https://agentes.exemplo.com:8000`. O `:8000`
+   só diz ao proxy para onde encaminhar; o acesso continua pelo domínio, sem porta.
+3. Em **Environment Variables**, preencha as obrigatórias: `SECRET_KEY`, `POSTGRES_PASSWORD`,
+   `ALLOWED_HOSTS=agentes.exemplo.com` e `CSRF_TRUSTED_ORIGINS=https://agentes.exemplo.com`. As opcionais
+   (chaves dos provedores, `GITHUB_TOKEN`, SMTP, limites) estão listadas no topo do arquivo. Os containers só
+   recebem as variáveis declaradas lá; para usar outra, acrescente-a ao arquivo.
+4. Faça o deploy e, no terminal do container `web` pelo Coolify, crie o primeiro usuário com
+   `python manage.py createsuperuser`. Os outros usuários são criados em `/admin/`.
+
+Os volumes do banco e dos worktrees são mantidos entre os deploys.
 
 ### Rodando fora do Docker
 
